@@ -46,7 +46,7 @@ class _TodoScreenState extends State<TodoScreen> {
     return SafeArea(
       child: Container(
         width: 260,
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -102,7 +102,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
                   return ListTile(
                     selected: isSelected,
-                    selectedTileColor: AppColors.borderBlue,
+                    selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
                     leading: Icon(
                       category == AppData.defaultCategory
                           ? Icons.task_alt
@@ -683,7 +683,7 @@ class _TodoScreenState extends State<TodoScreen> {
     final String subtitle = _taskSubtitle(task);
 
     return Card(
-      color: Colors.white,
+      color: Theme.of(context).cardTheme.color,
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
@@ -1032,7 +1032,7 @@ class _TodoScreenState extends State<TodoScreen> {
             );
 
             return Scaffold(
-              backgroundColor: AppColors.softBackground,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               appBar: AppBar(
                 title: const Text('Tasks'),
                 actions: [

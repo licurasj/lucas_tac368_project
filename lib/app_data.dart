@@ -50,6 +50,7 @@ class AppData {
   final int schemaVersion;
   final String deviceId;
   final DateTime lastModified;
+  final bool isDarkMode;
   final List<String> categories;
   final List<TaskItem> tasks;
   final List<JournalEntry> journalEntries;
@@ -66,6 +67,7 @@ class AppData {
     required this.schemaVersion,
     required this.deviceId,
     required this.lastModified,
+    required this.isDarkMode,
     required this.categories,
     required this.tasks,
     required this.journalEntries,
@@ -84,6 +86,7 @@ class AppData {
       schemaVersion: 2,
       deviceId: deviceId,
       lastModified: DateTime.now().toUtc(),
+      isDarkMode: false,
       categories: const [defaultCategory],
       tasks: const [],
       journalEntries: const [],
@@ -102,6 +105,7 @@ class AppData {
     int? schemaVersion,
     String? deviceId,
     DateTime? lastModified,
+    bool? isDarkMode,
     List<String>? categories,
     List<TaskItem>? tasks,
     List<JournalEntry>? journalEntries,
@@ -118,6 +122,7 @@ class AppData {
       schemaVersion: schemaVersion ?? this.schemaVersion,
       deviceId: deviceId ?? this.deviceId,
       lastModified: lastModified ?? this.lastModified,
+      isDarkMode: isDarkMode ?? this.isDarkMode,
       categories: categories ?? this.categories,
       tasks: tasks ?? this.tasks,
       journalEntries: journalEntries ?? this.journalEntries,
@@ -159,6 +164,7 @@ class AppData {
       'schemaVersion': schemaVersion,
       'deviceId': deviceId,
       'lastModified': lastModified.toUtc().toIso8601String(),
+      'isDarkMode': isDarkMode,
       'categories': categories,
       'tasks': tasks.map((task) => task.toJson()).toList(),
       'journalEntries': journalEntries.map((entry) => entry.toJson()).toList(),
@@ -239,6 +245,7 @@ class AppData {
       deviceId: json['deviceId'] as String? ?? '',
       lastModified: DateTime.tryParse(json['lastModified'] as String? ?? '')?.toUtc() ??
           DateTime.now().toUtc(),
+      isDarkMode: json['isDarkMode'] as bool? ?? false,
       categories: mergedCategories,
       tasks: loadedTasks,
       journalEntries: (json['journalEntries'] as List<dynamic>? ?? [])

@@ -56,6 +56,17 @@ class HomeScreen extends StatelessWidget {
             title: const Text('Hybrid Note App'),
             actions: [
               IconButton(
+                onPressed: () {
+                  context.read<AppCubit>().toggleDarkMode();
+                },
+                icon: Icon(
+                  state.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                ),
+                tooltip: state.isDarkMode
+                    ? 'Switch to light mode'
+                    : 'Switch to dark mode',
+              ),
+              IconButton(
                 onPressed: state.isSyncing
                     ? null
                     : () {

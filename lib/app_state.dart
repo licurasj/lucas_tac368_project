@@ -5,6 +5,7 @@ class AppState {
   final bool isLoading;
   final bool isSyncing;
   final bool isGoogleSignedIn;
+  final bool isDarkMode;
   final String? errorMessage;
   final String? syncMessage;
   final DateTime? lastSyncedAt;
@@ -14,6 +15,7 @@ class AppState {
     required this.isLoading,
     required this.isSyncing,
     required this.isGoogleSignedIn,
+    required this.isDarkMode,
     this.errorMessage,
     this.syncMessage,
     this.lastSyncedAt,
@@ -25,6 +27,7 @@ class AppState {
       isLoading: true,
       isSyncing: false,
       isGoogleSignedIn: false,
+      isDarkMode: false,
     );
   }
 
@@ -33,6 +36,7 @@ class AppState {
     bool? isLoading,
     bool? isSyncing,
     bool? isGoogleSignedIn,
+    bool? isDarkMode,
     String? errorMessage,
     String? syncMessage,
     DateTime? lastSyncedAt,
@@ -44,6 +48,7 @@ class AppState {
       isLoading: isLoading ?? this.isLoading,
       isSyncing: isSyncing ?? this.isSyncing,
       isGoogleSignedIn: isGoogleSignedIn ?? this.isGoogleSignedIn,
+      isDarkMode: isDarkMode ?? this.isDarkMode,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       syncMessage: clearSyncMessage ? null : syncMessage ?? this.syncMessage,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,

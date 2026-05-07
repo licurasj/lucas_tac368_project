@@ -302,7 +302,7 @@ class _JournalScreenState extends State<JournalScreen> {
           ..sort((a, b) => b.compareTo(a));
 
         return Scaffold(
-          backgroundColor: AppColors.softBackground,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
             title: const Text('Journal'),
           ),

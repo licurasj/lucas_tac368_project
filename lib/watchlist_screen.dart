@@ -241,7 +241,7 @@ class WatchlistScreen extends StatelessWidget {
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         return Scaffold(
-          backgroundColor: AppColors.softBackground,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
             title: const Text('Watch/Read List'),
           ),

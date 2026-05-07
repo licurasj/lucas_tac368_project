@@ -207,11 +207,11 @@ class GroceryScreen extends StatelessWidget {
 
                       return Card(
                         elevation: 0,
-                        color: AppColors.softCardBlue,
+                        color: Theme.of(context).colorScheme.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
-                          side: const BorderSide(
-                            color: AppColors.borderBlue,
+                          side: BorderSide(
+                            color: Theme.of(context).dividerTheme.color ?? AppColors.borderBlue,
                           ),
                         ),
                         child: ListTile(
@@ -366,7 +366,7 @@ class GroceryScreen extends StatelessWidget {
           });
 
         return Scaffold(
-          backgroundColor: AppColors.softBackground,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
             title: const Text('Grocery List'),
           ),

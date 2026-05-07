@@ -44,6 +44,23 @@ class AppCubit extends Cubit<AppState> {
     });
   }
 
+
+  Future<void> toggleDarkMode() async {
+    final bool nextMode = !state.isDarkMode;
+
+    emit(
+      state.copyWith(
+        isDarkMode: nextMode,
+      ),
+    );
+
+    await _updateAndSave(
+      state.data.copyWith(
+        isDarkMode: nextMode,
+      ),
+    );
+  }
+
   Future<void> loadData() async {
     emit(
       state.copyWith(
@@ -59,6 +76,7 @@ class AppCubit extends Cubit<AppState> {
       emit(
         state.copyWith(
           data: loadedData,
+          isDarkMode: loadedData.isDarkMode,
           isLoading: false,
           isGoogleSignedIn: driveSyncService.isSignedIn,
           clearError: true,
@@ -113,6 +131,7 @@ class AppCubit extends Cubit<AppState> {
         emit(
           state.copyWith(
             data: result.syncedData!,
+            isDarkMode: result.syncedData!.isDarkMode,
             isSyncing: false,
             isGoogleSignedIn: driveSyncService.isSignedIn,
             lastSyncedAt: DateTime.now().toUtc(),
@@ -189,6 +208,7 @@ class AppCubit extends Cubit<AppState> {
     emit(
       state.copyWith(
         data: updatedData,
+        isDarkMode: updatedData.isDarkMode,
         clearError: true,
       ),
     );
@@ -248,6 +268,7 @@ class AppCubit extends Cubit<AppState> {
           emit(
             state.copyWith(
               data: syncedData,
+              isDarkMode: syncedData.isDarkMode,
               isGoogleSignedIn: true,
               lastSyncedAt: DateTime.now().toUtc(),
               clearError: true,
@@ -387,6 +408,7 @@ class AppCubit extends Cubit<AppState> {
       emit(
         state.copyWith(
           data: result.syncedData!,
+          isDarkMode: result.syncedData!.isDarkMode,
           isSyncing: false,
           isGoogleSignedIn: driveSyncService.isSignedIn,
           syncMessage: message,

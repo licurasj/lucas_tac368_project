@@ -363,6 +363,7 @@ class DriveSyncService {
       'schemaVersion': 2,
       'deviceId': localJson['deviceId'] ?? remoteJson['deviceId'] ?? '',
       'lastModified': DateTime.now().toUtc().toIso8601String(),
+      'isDarkMode': _newerAppData(localJson, remoteJson)['isDarkMode'] as bool? ?? false,
       'categories': _mergeCategories(
         _asList(localJson['categories']),
         _asList(remoteJson['categories']),
@@ -676,6 +677,22 @@ class DriveSyncService {
       _normalizedString(item['section']),
       _normalizedString(item['autoAddToNext']),
     ].join('|');
+  }
+
+  Map<String, dynamic> _newerAppData(
+    Map<String, dynamic> localJson,
+    Map<String, dynamic> remoteJson,
+  ) {
+    final DateTime localTime = _parseDateTime(localJson['lastModified']) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    final DateTime remoteTime = _parseDateTime(remoteJson['lastModified']) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+    if (localTime.isAfter(remoteTime)) {
+      return localJson;
+    }
+
+    return remoteJson;
   }
 
   int _compareByUpdatedAtOrCreatedAtDescending(
