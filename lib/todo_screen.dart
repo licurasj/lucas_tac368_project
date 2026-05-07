@@ -384,12 +384,10 @@ class _TodoScreenState extends State<TodoScreen> {
                         },
                       ),
                       if (hasReminder) ...[
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final bool narrowButtons =
-                                constraints.maxWidth < 360;
-
-                            final Widget dateButton = OutlinedButton.icon(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            OutlinedButton.icon(
                               onPressed: () async {
                                 final DateTime? picked = await showDatePicker(
                                   context: context,
@@ -415,9 +413,9 @@ class _TodoScreenState extends State<TodoScreen> {
                                     : DateFormat.yMMMd().format(reminderDate!),
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            );
-
-                            final Widget timeButton = OutlinedButton.icon(
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
                               onPressed: () async {
                                 final TimeOfDay? picked = await showTimePicker(
                                   context: context,
@@ -437,27 +435,8 @@ class _TodoScreenState extends State<TodoScreen> {
                                     : reminderTime!.format(context),
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            );
-
-                            if (narrowButtons) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  dateButton,
-                                  const SizedBox(height: 8),
-                                  timeButton,
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              children: [
-                                Expanded(child: dateButton),
-                                const SizedBox(width: 8),
-                                Expanded(child: timeButton),
-                              ],
-                            );
-                          },
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<RepeatFrequency>(

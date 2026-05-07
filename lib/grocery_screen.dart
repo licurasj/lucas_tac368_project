@@ -132,8 +132,10 @@ class GroceryScreen extends StatelessWidget {
       },
     );
 
-    titleController.dispose();
-    descriptionController.dispose();
+    // Do not dispose these local controllers here. Android can rebuild the
+    // closing dialog/TextField for a frame after showDialog completes, especially
+    // while the keyboard is hiding. Disposing immediately caused
+    // "TextEditingController was used after being disposed" crashes.
   }
 
   Widget _sectionPanel({
@@ -156,12 +158,16 @@ class GroceryScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 16, 12, 10),
             child: Row(
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0A3D91),
+                Expanded(
+                  child: Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A3D91),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -172,7 +178,7 @@ class GroceryScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: () {
                     _showGroceryDialog(

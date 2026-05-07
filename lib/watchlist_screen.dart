@@ -40,11 +40,14 @@ class WatchlistScreen extends StatelessWidget {
             return AlertDialog(
               title: Text(
                 item == null ? 'Add Watch/Read Item' : 'Edit Watch/Read Item',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
               content: SizedBox(
                 width: 420,
                 child: SingleChildScrollView(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       TextField(
                         controller: titleController,
@@ -55,6 +58,7 @@ class WatchlistScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<MediaType>(
                         value: selectedType,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Type',
                         ),
@@ -88,6 +92,7 @@ class WatchlistScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<WatchStatus>(
                         value: selectedStatus,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Status',
                         ),
@@ -176,10 +181,10 @@ class WatchlistScreen extends StatelessWidget {
       },
     );
 
-    titleController.dispose();
-    seasonController.dispose();
-    episodeController.dispose();
-    notesController.dispose();
+    // Intentionally do not dispose these local dialog controllers immediately.
+    // On Android, the dialog route and keyboard can still rebuild TextFields for
+    // a frame while closing, and disposing here can cause:
+    // "A TextEditingController was used after being disposed."
   }
 
   static String _statusLabel(WatchStatus status) {
@@ -260,29 +265,51 @@ class WatchlistScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: ListTile(
-                        title: Text(item.title),
-                        subtitle: Text(_watchSubtitle(item)),
-                        trailing: Wrap(
-                          spacing: 2,
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                _showWatchItemDialog(
-                                  context,
-                                  item: item,
-                                );
-                              },
-                              icon: const Icon(Icons.edit_outlined),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                context.read<AppCubit>().deleteWatchItem(
-                                      item.id,
-                                    );
-                              },
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
+                        title: Text(
+                          item.title,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                        subtitle: Text(
+                          _watchSubtitle(item),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 3,
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _showWatchItemDialog(
+                                context,
+                                item: item,
+                              );
+                            }
+
+                            if (value == 'delete') {
+                              context.read<AppCubit>().deleteWatchItem(
+                                    item.id,
+                                  );
+                            }
+                          },
+                          itemBuilder: (context) {
+                            return const [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: ListTile(
+                                  leading: Icon(Icons.edit_outlined),
+                                  title: Text('Edit'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: ListTile(
+                                  leading: Icon(Icons.delete_outline),
+                                  title: Text('Delete'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ];
+                          },
                         ),
                       ),
                     );

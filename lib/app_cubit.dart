@@ -17,6 +17,7 @@ class AppCubit extends Cubit<AppState> {
 
   bool _isAutoSyncing = false;
   bool _needsAnotherAutoSync = false;
+  int _localChangeVersion = 0;
 
   AppCubit({
     required this.storage,
@@ -77,6 +78,8 @@ class AppCubit extends Cubit<AppState> {
         return;
       }
 
+      final int syncStartVersion = _localChangeVersion;
+
       emit(
         state.copyWith(
           isGoogleSignedIn: true,
@@ -89,6 +92,20 @@ class AppCubit extends Cubit<AppState> {
       final SyncResult result = await driveSyncService.sync(
         localData: loadedData,
       );
+
+      if (syncStartVersion != _localChangeVersion) {
+        // The user changed local data while startup sync was running.
+        // Do not apply an older cloud result over the user's newer edit.
+        emit(
+          state.copyWith(
+            isSyncing: false,
+            isGoogleSignedIn: driveSyncService.isSignedIn,
+            clearSyncMessage: true,
+          ),
+        );
+        await _autoPushLocalChange();
+        return;
+      }
 
       if (result.success && result.syncedData != null) {
         await _saveData(result.syncedData!);
@@ -132,6 +149,8 @@ class AppCubit extends Cubit<AppState> {
     final AppData updatedData = data.copyWith(
       lastModified: DateTime.now().toUtc(),
     );
+
+    _localChangeVersion++;
 
     emit(
       state.copyWith(
@@ -180,21 +199,31 @@ class AppCubit extends Cubit<AppState> {
     do {
       _needsAnotherAutoSync = false;
 
+      final int uploadVersion = _localChangeVersion;
+      final AppData uploadSnapshot = state.data;
+
       final SyncResult result = await driveSyncService.pushLocalToDrive(
-        localData: state.data,
+        localData: uploadSnapshot,
       );
 
-      if (result.success && result.syncedData != null) {
-        await _saveData(result.syncedData!);
+      if (result.success) {
+        // Important: do NOT replace state.data here. The UI already has the
+        // optimistic local edit. Replacing with the result from an older upload
+        // can make a checkbox flip back if another local edit happened while
+        // the network request was in flight.
+        if (uploadVersion == _localChangeVersion) {
+          await _saveData(uploadSnapshot);
 
-        emit(
-          state.copyWith(
-            data: result.syncedData!,
-            isGoogleSignedIn: true,
-            lastSyncedAt: DateTime.now().toUtc(),
-            clearError: true,
-          ),
-        );
+          emit(
+            state.copyWith(
+              isGoogleSignedIn: true,
+              lastSyncedAt: DateTime.now().toUtc(),
+              clearError: true,
+            ),
+          );
+        } else {
+          _needsAnotherAutoSync = true;
+        }
       } else {
         failureMessage = result.message;
         emit(
@@ -270,6 +299,8 @@ class AppCubit extends Cubit<AppState> {
     );
 
     _clearSyncMessageSoon(message);
+
+    await syncWithDrive();
   }
 
   Future<void> signOutOfGoogle() async {
@@ -289,6 +320,9 @@ class AppCubit extends Cubit<AppState> {
   }
 
   Future<void> syncWithDrive() async {
+    final int syncStartVersion = _localChangeVersion;
+    final AppData syncSnapshot = state.data;
+
     emit(
       state.copyWith(
         isSyncing: true,
@@ -297,7 +331,21 @@ class AppCubit extends Cubit<AppState> {
       ),
     );
 
-    final SyncResult result = await driveSyncService.sync(localData: state.data);
+    final SyncResult result = await driveSyncService.sync(localData: syncSnapshot);
+
+    if (syncStartVersion != _localChangeVersion) {
+      // A local edit happened while manual sync was running.
+      // Do not apply remote data over that edit; push the newest local state instead.
+      emit(
+        state.copyWith(
+          isSyncing: false,
+          isGoogleSignedIn: driveSyncService.isSignedIn,
+          clearSyncMessage: true,
+        ),
+      );
+      await _autoPushLocalChange();
+      return;
+    }
 
     if (result.success && result.syncedData != null) {
       await _saveData(result.syncedData!);

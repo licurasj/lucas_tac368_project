@@ -48,7 +48,8 @@ class DriveSyncService {
   }
 
   // Manual sync / login sync / pull-to-refresh sync:
-  // download remote, merge/prune, save locally, upload merged file.
+  // last-write-wins by AppData.lastModified. This avoids stale devices
+  // re-adding tasks that were cleared/deleted on another device.
   Future<SyncResult> sync({
     required AppData localData,
   }) async {
@@ -130,25 +131,27 @@ class DriveSyncService {
       }
 
       final String? remoteFileId = await _findRemoteFileId(driveApi);
-      final AppData uploadData = _copyWithSyncTime(localData);
 
+      // Upload the exact app state that AppCubit already timestamped and saved.
+      // Do not create a second modified copy here, because returning a modified
+      // copy from an older network request can overwrite newer checkbox edits.
       if (remoteFileId == null) {
         await _createRemoteFile(
           driveApi: driveApi,
-          data: uploadData,
+          data: localData,
         );
       } else {
         await _updateRemoteFile(
           driveApi: driveApi,
           fileId: remoteFileId,
-          data: uploadData,
+          data: localData,
         );
       }
 
       return SyncResult.success(
         status: SyncStatus.localNewerUploaded,
         message: 'Sync complete.',
-        syncedData: uploadData,
+        syncedData: localData,
       );
     } catch (error) {
       return SyncResult.failed(
@@ -164,17 +167,15 @@ class DriveSyncService {
     final String? remoteFileId = await _findRemoteFileId(driveApi);
 
     if (remoteFileId == null) {
-      final AppData uploadData = _copyWithSyncTime(localData);
-
       await _createRemoteFile(
         driveApi: driveApi,
-        data: uploadData,
+        data: localData,
       );
 
       return SyncResult.success(
         status: SyncStatus.noRemoteCreated,
         message: 'Sync complete.',
-        syncedData: uploadData,
+        syncedData: localData,
       );
     }
 
@@ -184,40 +185,48 @@ class DriveSyncService {
     );
 
     if (remoteData == null) {
-      final AppData uploadData = _copyWithSyncTime(localData);
-
       await _updateRemoteFile(
         driveApi: driveApi,
         fileId: remoteFileId,
-        data: uploadData,
+        data: localData,
       );
 
       return SyncResult.success(
         status: SyncStatus.localNewerUploaded,
         message: 'Sync complete.',
-        syncedData: uploadData,
+        syncedData: localData,
       );
     }
 
-    final AppData mergedData = _mergeAppData(
-      localData: localData,
-      remoteData: remoteData,
-    );
+    final DateTime localModified = localData.lastModified.toUtc();
+    final DateTime remoteModified = remoteData.lastModified.toUtc();
 
-    await _updateRemoteFile(
-      driveApi: driveApi,
-      fileId: remoteFileId,
-      data: mergedData,
-    );
+    if (remoteModified.isAfter(localModified)) {
+      return SyncResult.success(
+        status: SyncStatus.remoteNewerDownloaded,
+        message: 'Sync complete.',
+        syncedData: remoteData,
+      );
+    }
+
+    if (localModified.isAfter(remoteModified)) {
+      await _updateRemoteFile(
+        driveApi: driveApi,
+        fileId: remoteFileId,
+        data: localData,
+      );
+
+      return SyncResult.success(
+        status: SyncStatus.localNewerUploaded,
+        message: 'Sync complete.',
+        syncedData: localData,
+      );
+    }
 
     return SyncResult.success(
-      status: SyncStatus.merged,
-      message: _mergeMessage(
-        localData: localData,
-        remoteData: remoteData,
-        mergedData: mergedData,
-      ),
-      syncedData: mergedData,
+      status: SyncStatus.noChanges,
+      message: 'Sync complete.',
+      syncedData: localData,
     );
   }
 

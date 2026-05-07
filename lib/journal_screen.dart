@@ -46,15 +46,20 @@ class _JournalScreenState extends State<JournalScreen> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        entry == null ? 'Add Journal Entry' : 'Edit Journal Entry',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A3D91),
+                      Expanded(
+                        child: Text(
+                          entry == null
+                              ? 'Add Journal Entry'
+                              : 'Edit Journal Entry',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A3D91),
+                          ),
                         ),
                       ),
-                      const Spacer(),
                       IconButton(
                         onPressed: () {
                           Navigator.of(dialogContext).pop();
@@ -124,8 +129,10 @@ class _JournalScreenState extends State<JournalScreen> {
       },
     );
 
-    titleController.dispose();
-    bodyController.dispose();
+    // Do not dispose these local controllers here. Android can rebuild the
+    // closing dialog/TextField for a frame after showDialog completes, especially
+    // while the keyboard is hiding. Disposing immediately caused
+    // "TextEditingController was used after being disposed" crashes.
   }
 
   Future<void> _showReadJournalDialog(
@@ -196,9 +203,18 @@ class _JournalScreenState extends State<JournalScreen> {
                       OutlinedButton.icon(
                         onPressed: () {
                           Navigator.of(dialogContext).pop();
-                          _showJournalDialog(
-                            context,
-                            entry: entry,
+                          Future<void>.delayed(
+                            const Duration(milliseconds: 120),
+                            () {
+                              if (!mounted) {
+                                return;
+                              }
+
+                              _showJournalDialog(
+                                context,
+                                entry: entry,
+                              );
+                            },
                           );
                         },
                         icon: const Icon(Icons.edit_outlined),
