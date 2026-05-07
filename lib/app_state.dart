@@ -4,6 +4,7 @@ class AppState {
   final AppData data;
   final bool isLoading;
   final bool isSyncing;
+  final bool isGoogleSignedIn;
   final String? errorMessage;
   final String? syncMessage;
   final DateTime? lastSyncedAt;
@@ -12,6 +13,7 @@ class AppState {
     required this.data,
     required this.isLoading,
     required this.isSyncing,
+    required this.isGoogleSignedIn,
     this.errorMessage,
     this.syncMessage,
     this.lastSyncedAt,
@@ -22,6 +24,7 @@ class AppState {
       data: AppData.empty(deviceId),
       isLoading: true,
       isSyncing: false,
+      isGoogleSignedIn: false,
     );
   }
 
@@ -29,6 +32,7 @@ class AppState {
     AppData? data,
     bool? isLoading,
     bool? isSyncing,
+    bool? isGoogleSignedIn,
     String? errorMessage,
     String? syncMessage,
     DateTime? lastSyncedAt,
@@ -39,9 +43,9 @@ class AppState {
       data: data ?? this.data,
       isLoading: isLoading ?? this.isLoading,
       isSyncing: isSyncing ?? this.isSyncing,
+      isGoogleSignedIn: isGoogleSignedIn ?? this.isGoogleSignedIn,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-      syncMessage:
-          clearSyncMessage ? null : syncMessage ?? this.syncMessage,
+      syncMessage: clearSyncMessage ? null : syncMessage ?? this.syncMessage,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }

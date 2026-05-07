@@ -125,28 +125,54 @@ class HomeScreen extends StatelessWidget {
                                   ? 'Not synced yet.'
                                   : 'Last synced: ${state.lastSyncedAt!.toLocal()}',
                         ),
-                        if (state.syncMessage != null) ...[
+
+                        // Only show syncMessage when NOT currently syncing.
+                        // This prevents duplicate "Syncing..." text.
+                        if (!state.isSyncing && state.syncMessage != null) ...[
                           const SizedBox(height: 8),
                           Text(state.syncMessage!),
                         ],
+
                         const SizedBox(height: 12),
+
+                        // This button is ONLY for login/logout.
                         OutlinedButton.icon(
                           onPressed: state.isSyncing
                               ? null
                               : () {
-                                  context.read<AppCubit>().signInToGoogle();
+                                  if (state.isGoogleSignedIn) {
+                                    context.read<AppCubit>().signOutOfGoogle();
+                                  } else {
+                                    context.read<AppCubit>().signInToGoogle();
+                                  }
                                 },
-                          icon: const Icon(Icons.login),
-                          label: const Text('Sign in with Google'),
+                          icon: Icon(
+                            state.isGoogleSignedIn ? Icons.logout : Icons.login,
+                          ),
+                          label: Text(
+                            state.isGoogleSignedIn ? 'Log out' : 'Sign in with Google',
+                          ),
                         ),
+
                         const SizedBox(height: 8),
+
+                        // This button is ONLY for manual sync.
                         FilledButton.icon(
                           onPressed: state.isSyncing
                               ? null
                               : () {
                                   context.read<AppCubit>().syncWithDrive();
                                 },
-                          icon: const Icon(Icons.cloud_sync),
+                          icon: state.isSyncing
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.cloud_sync),
                           label: const Text('Sync to Google Drive'),
                         ),
                       ],

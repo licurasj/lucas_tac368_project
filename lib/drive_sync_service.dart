@@ -6,17 +6,12 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 
 import 'app_data.dart';
-import 'grocery_item.dart';
-import 'journal_entry.dart';
 import 'sync_result.dart';
-import 'task_item.dart';
-import 'watch_item.dart';
 
 class DriveSyncService {
   static const String _fileName = 'hybrid_note_app_data.json';
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    // clientId: '377269928861-0u5fenqlrrdmhue0vf7g0cq148npl1gh.apps.googleusercontent.com',
     scopes: [
       drive.DriveApi.driveAppdataScope,
     ],
@@ -24,102 +19,17 @@ class DriveSyncService {
 
   http.Client? _authClient;
 
-  Future<SyncResult> sync({
-    required AppData localData,
-  }) async {
-    try {
-      final drive.DriveApi? driveApi = await _getDriveApi();
+  bool get isSignedIn {
+    return _googleSignIn.currentUser != null;
+  }
 
-      if (driveApi == null) {
-        return SyncResult.failed(
-          'Google sign-in was cancelled. Local data is still saved.',
-        );
-      }
+  String? get signedInEmail {
+    return _googleSignIn.currentUser?.email;
+  }
 
-      final String? remoteFileId = await _findRemoteFileId(driveApi);
-
-      if (remoteFileId == null) {
-        await _createRemoteFile(
-          driveApi: driveApi,
-          data: localData,
-        );
-
-        return SyncResult.success(
-          status: SyncStatus.noRemoteCreated,
-          message: 'Created Google Drive sync file. Local data uploaded.',
-          syncedData: localData,
-        );
-      }
-
-      final AppData? remoteData = await _downloadRemoteData(
-        driveApi: driveApi,
-        fileId: remoteFileId,
-      );
-
-      if (remoteData == null) {
-        await _updateRemoteFile(
-          driveApi: driveApi,
-          fileId: remoteFileId,
-          data: localData,
-        );
-
-        return SyncResult.success(
-          status: SyncStatus.localNewerUploaded,
-          message: 'Remote file was unreadable, so local data was uploaded.',
-          syncedData: localData,
-        );
-      }
-
-      final AppData mergedData = _mergeAppData(
-        localData: localData,
-        remoteData: remoteData,
-      );
-
-      final bool localWasNewer =
-          localData.lastModified.isAfter(remoteData.lastModified);
-      final bool remoteWasNewer =
-          remoteData.lastModified.isAfter(localData.lastModified);
-
-      await _updateRemoteFile(
-        driveApi: driveApi,
-        fileId: remoteFileId,
-        data: mergedData,
-      );
-
-      if (_sameInstant(localData.lastModified, remoteData.lastModified)) {
-        return SyncResult.success(
-          status: SyncStatus.noChanges,
-          message: 'Sync complete. No major changes found.',
-          syncedData: mergedData,
-        );
-      }
-
-      if (localWasNewer && !_dataCountsChanged(localData, mergedData)) {
-        return SyncResult.success(
-          status: SyncStatus.localNewerUploaded,
-          message: 'Local changes uploaded to Google Drive.',
-          syncedData: mergedData,
-        );
-      }
-
-      if (remoteWasNewer && !_dataCountsChanged(remoteData, mergedData)) {
-        return SyncResult.success(
-          status: SyncStatus.remoteNewerDownloaded,
-          message: 'Newer Google Drive data downloaded.',
-          syncedData: mergedData,
-        );
-      }
-
-      return SyncResult.success(
-        status: SyncStatus.merged,
-        message: 'Sync complete. Local and remote changes were merged.',
-        syncedData: mergedData,
-      );
-    } catch (error) {
-      return SyncResult.failed(
-        'Google Drive sync failed. Local data is still saved. $error',
-      );
-    }
+  Future<bool> signIn() async {
+    final drive.DriveApi? api = await _getDriveApi();
+    return api != null;
   }
 
   Future<void> signOut() async {
@@ -128,9 +38,187 @@ class DriveSyncService {
     _authClient = null;
   }
 
-  Future<bool> signIn() async {
-    final drive.DriveApi? api = await _getDriveApi();
-    return api != null;
+  Future<bool> tryRestorePreviousSignIn() async {
+    try {
+      final GoogleSignInAccount? account = await _googleSignIn.signInSilently();
+      return account != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Manual sync / login sync / pull-to-refresh sync:
+  // download remote, merge/prune, save locally, upload merged file.
+  Future<SyncResult> sync({
+    required AppData localData,
+  }) async {
+    try {
+      final drive.DriveApi? driveApi = await _getDriveApi();
+
+      if (driveApi == null) {
+        return SyncResult.failed(
+          'Google sign-in failed or was cancelled. Local data is still saved.',
+        );
+      }
+
+      return _mergeThenUpload(
+        driveApi: driveApi,
+        localData: localData,
+      );
+    } catch (error) {
+      return SyncResult.failed(
+        'Google Drive sync failed. Local data is still saved. $error',
+      );
+    }
+  }
+
+  // Startup auto-sync:
+  // only runs if a previous Google sign-in can be restored silently.
+  Future<SyncResult> autoSyncIfSignedIn({
+    required AppData localData,
+  }) async {
+    try {
+      if (_googleSignIn.currentUser == null) {
+        await tryRestorePreviousSignIn();
+      }
+
+      if (_googleSignIn.currentUser == null) {
+        return SyncResult.failed(
+          'Not signed in. Auto-sync skipped.',
+        );
+      }
+
+      final drive.DriveApi? driveApi = await _getDriveApi();
+
+      if (driveApi == null) {
+        return SyncResult.failed(
+          'Google sign-in could not be restored. Local data is still saved.',
+        );
+      }
+
+      return _mergeThenUpload(
+        driveApi: driveApi,
+        localData: localData,
+      );
+    } catch (error) {
+      return SyncResult.failed(
+        'Auto-sync failed. Local data is still saved. $error',
+      );
+    }
+  }
+
+  // Local edit sync:
+  // upload local data as the new source of truth. This is important for deletes.
+  // If you delete/clear/tick locally and we used merge here, the old cloud item
+  // could be merged back. So local edits push the new local JSON to Drive.
+  Future<SyncResult> pushLocalToDrive({
+    required AppData localData,
+  }) async {
+    try {
+      if (_googleSignIn.currentUser == null) {
+        return SyncResult.failed(
+          'Not signed in. Local data is saved but not synced.',
+        );
+      }
+
+      final drive.DriveApi? driveApi = await _getDriveApi();
+
+      if (driveApi == null) {
+        return SyncResult.failed(
+          'Google sign-in could not be restored. Local data is still saved.',
+        );
+      }
+
+      final String? remoteFileId = await _findRemoteFileId(driveApi);
+      final AppData uploadData = _copyWithSyncTime(localData);
+
+      if (remoteFileId == null) {
+        await _createRemoteFile(
+          driveApi: driveApi,
+          data: uploadData,
+        );
+      } else {
+        await _updateRemoteFile(
+          driveApi: driveApi,
+          fileId: remoteFileId,
+          data: uploadData,
+        );
+      }
+
+      return SyncResult.success(
+        status: SyncStatus.localNewerUploaded,
+        message: 'Sync complete.',
+        syncedData: uploadData,
+      );
+    } catch (error) {
+      return SyncResult.failed(
+        'Auto-sync failed. Local data is still saved. $error',
+      );
+    }
+  }
+
+  Future<SyncResult> _mergeThenUpload({
+    required drive.DriveApi driveApi,
+    required AppData localData,
+  }) async {
+    final String? remoteFileId = await _findRemoteFileId(driveApi);
+
+    if (remoteFileId == null) {
+      final AppData uploadData = _copyWithSyncTime(localData);
+
+      await _createRemoteFile(
+        driveApi: driveApi,
+        data: uploadData,
+      );
+
+      return SyncResult.success(
+        status: SyncStatus.noRemoteCreated,
+        message: 'Sync complete.',
+        syncedData: uploadData,
+      );
+    }
+
+    final AppData? remoteData = await _downloadRemoteData(
+      driveApi: driveApi,
+      fileId: remoteFileId,
+    );
+
+    if (remoteData == null) {
+      final AppData uploadData = _copyWithSyncTime(localData);
+
+      await _updateRemoteFile(
+        driveApi: driveApi,
+        fileId: remoteFileId,
+        data: uploadData,
+      );
+
+      return SyncResult.success(
+        status: SyncStatus.localNewerUploaded,
+        message: 'Sync complete.',
+        syncedData: uploadData,
+      );
+    }
+
+    final AppData mergedData = _mergeAppData(
+      localData: localData,
+      remoteData: remoteData,
+    );
+
+    await _updateRemoteFile(
+      driveApi: driveApi,
+      fileId: remoteFileId,
+      data: mergedData,
+    );
+
+    return SyncResult.success(
+      status: SyncStatus.merged,
+      message: _mergeMessage(
+        localData: localData,
+        remoteData: remoteData,
+        mergedData: mergedData,
+      ),
+      syncedData: mergedData,
+    );
   }
 
   Future<drive.DriveApi?> _getDriveApi() async {
@@ -146,7 +234,6 @@ class DriveSyncService {
 
       if (account == null) {
         print('Google Drive: signIn returned null.');
-        print('Google Drive: On macOS, this often means the OAuth redirect did not return to the app.');
         return null;
       }
 
@@ -214,10 +301,11 @@ class DriveSyncService {
       ..parents = ['appDataFolder'];
 
     final String encodedData = _encodeAppData(data);
+    final List<int> encodedBytes = utf8.encode(encodedData);
 
     final drive.Media media = drive.Media(
-      Stream<List<int>>.value(utf8.encode(encodedData)),
-      utf8.encode(encodedData).length,
+      Stream<List<int>>.value(encodedBytes),
+      encodedBytes.length,
       contentType: 'application/json',
     );
 
@@ -233,10 +321,11 @@ class DriveSyncService {
     required AppData data,
   }) async {
     final String encodedData = _encodeAppData(data);
+    final List<int> encodedBytes = utf8.encode(encodedData);
 
     final drive.Media media = drive.Media(
-      Stream<List<int>>.value(utf8.encode(encodedData)),
-      utf8.encode(encodedData).length,
+      Stream<List<int>>.value(encodedBytes),
+      encodedBytes.length,
       contentType: 'application/json',
     );
 
@@ -252,124 +341,396 @@ class DriveSyncService {
     return encoder.convert(data.toJson());
   }
 
-  bool _sameInstant(DateTime a, DateTime b) {
-    return a.toUtc().toIso8601String() == b.toUtc().toIso8601String();
-  }
-
-  bool _dataCountsChanged(AppData oldData, AppData newData) {
-    return oldData.tasks.length != newData.tasks.length ||
-        oldData.journalEntries.length != newData.journalEntries.length ||
-        oldData.watchItems.length != newData.watchItems.length ||
-        oldData.groceryItems.length != newData.groceryItems.length ||
-        oldData.categories.length != newData.categories.length;
+  AppData _copyWithSyncTime(AppData data) {
+    return data.copyWith(
+      lastModified: DateTime.now().toUtc(),
+    );
   }
 
   AppData _mergeAppData({
     required AppData localData,
     required AppData remoteData,
   }) {
-    final DateTime now = DateTime.now().toUtc();
+    final Map<String, dynamic> localJson =
+        Map<String, dynamic>.from(localData.toJson());
+    final Map<String, dynamic> remoteJson =
+        Map<String, dynamic>.from(remoteData.toJson());
 
-    return AppData(
-      schemaVersion: localData.schemaVersion > remoteData.schemaVersion
-          ? localData.schemaVersion
-          : remoteData.schemaVersion,
-      deviceId: localData.deviceId,
-      lastModified: now,
-      categories: _mergeCategories(
-        localData.categories,
-        remoteData.categories,
-      ),
-      tasks: _mergeByUpdatedAt<TaskItem>(
-        localData.tasks,
-        remoteData.tasks,
-        getId: (task) => task.id,
-        getUpdatedAt: (task) => task.updatedAt,
-      ),
-      journalEntries: _mergeByUpdatedAt<JournalEntry>(
-        localData.journalEntries,
-        remoteData.journalEntries,
-        getId: (entry) => entry.id,
-        getUpdatedAt: (entry) => entry.updatedAt,
-      ),
-      watchItems: _mergeByUpdatedAt<WatchItem>(
-        localData.watchItems,
-        remoteData.watchItems,
-        getId: (item) => item.id,
-        getUpdatedAt: (item) => item.updatedAt,
-      ),
-      groceryItems: _mergeByUpdatedAt<GroceryItem>(
-        localData.groceryItems,
-        remoteData.groceryItems,
-        getId: (item) => item.id,
-        getUpdatedAt: (item) => item.updatedAt,
-      ),
-    );
-  }
-
-  List<String> _mergeCategories(
-    List<String> localCategories,
-    List<String> remoteCategories,
-  ) {
-    final Set<String> mergedSet = {
-      AppData.defaultCategory,
-      ...localCategories,
-      ...remoteCategories,
+    final Map<String, dynamic> merged = {
+      ...remoteJson,
+      ...localJson,
     };
 
-    mergedSet.remove('My Tasks');
+    merged['schemaVersion'] = _maxInt(
+      localJson['schemaVersion'],
+      remoteJson['schemaVersion'],
+    );
+    merged['deviceId'] = localJson['deviceId'] ?? remoteJson['deviceId'];
+    merged['lastModified'] = DateTime.now().toUtc().toIso8601String();
 
-    final List<String> merged = mergedSet
-        .where((category) => category.trim().isNotEmpty)
-        .toList();
+    merged['categories'] = _mergeStringList(
+      _asList(localJson['categories']),
+      _asList(remoteJson['categories']),
+      removeLegacyMyTasks: true,
+    );
 
-    merged.sort((a, b) {
-      if (a == AppData.defaultCategory) {
-        return -1;
-      }
+    merged['tasks'] = _mergeTasksByTitle(
+      _asListOfMaps(localJson['tasks']),
+      _asListOfMaps(remoteJson['tasks']),
+    );
 
-      if (b == AppData.defaultCategory) {
-        return 1;
-      }
+    merged['journalEntries'] = _mergeExactDuplicateOnly(
+      _asListOfMaps(localJson['journalEntries']),
+      _asListOfMaps(remoteJson['journalEntries']),
+      keyBuilder: _journalExactKey,
+    );
 
-      return a.compareTo(b);
-    });
+    merged['watchItems'] = _mergeExactDuplicateOnly(
+      _asListOfMaps(localJson['watchItems']),
+      _asListOfMaps(remoteJson['watchItems']),
+      keyBuilder: _watchExactKey,
+    );
 
-    return merged;
+    merged['groceryItems'] = _mergeExactDuplicateOnly(
+      _asListOfMaps(localJson['groceryItems']),
+      _asListOfMaps(remoteJson['groceryItems']),
+      keyBuilder: _genericExactKey,
+    );
+
+    return AppData.fromJson(merged);
   }
 
-  List<T> _mergeByUpdatedAt<T>(
-    List<T> localItems,
-    List<T> remoteItems, {
-    required String Function(T item) getId,
-    required DateTime Function(T item) getUpdatedAt,
-  }) {
-    final Map<String, T> merged = {};
+  List<Map<String, dynamic>> _mergeTasksByTitle(
+    List<Map<String, dynamic>> localTasks,
+    List<Map<String, dynamic>> remoteTasks,
+  ) {
+    final Map<String, Map<String, dynamic>> merged = {};
 
-    for (final T item in remoteItems) {
-      merged[getId(item)] = item;
+    for (final Map<String, dynamic> task in remoteTasks) {
+      final String key = _taskTitleKey(task);
+      merged[key.isEmpty ? _fallbackItemKey(task) : key] =
+          Map<String, dynamic>.from(task);
     }
 
-    for (final T localItem in localItems) {
-      final String id = getId(localItem);
-      final T? remoteItem = merged[id];
+    for (final Map<String, dynamic> localTask in localTasks) {
+      final String key = _taskTitleKey(localTask);
+      final String safeKey = key.isEmpty ? _fallbackItemKey(localTask) : key;
+      final Map<String, dynamic>? remoteTask = merged[safeKey];
 
-      if (remoteItem == null) {
-        merged[id] = localItem;
+      if (remoteTask == null) {
+        merged[safeKey] = Map<String, dynamic>.from(localTask);
         continue;
       }
 
-      if (getUpdatedAt(localItem).isAfter(getUpdatedAt(remoteItem))) {
-        merged[id] = localItem;
+      merged[safeKey] = _mergeOneTaskByTitle(
+        localTask: localTask,
+        remoteTask: remoteTask,
+      );
+    }
+
+    final List<Map<String, dynamic>> output = merged.values.toList();
+    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
+    return output;
+  }
+
+  Map<String, dynamic> _mergeOneTaskByTitle({
+    required Map<String, dynamic> localTask,
+    required Map<String, dynamic> remoteTask,
+  }) {
+    final bool localNewer = _itemUpdatedAt(localTask).isAfter(
+      _itemUpdatedAt(remoteTask),
+    );
+
+    final Map<String, dynamic> base = Map<String, dynamic>.from(
+      localNewer ? localTask : remoteTask,
+    );
+    final Map<String, dynamic> older = localNewer ? remoteTask : localTask;
+
+    base['subtasks'] = _mergeSubtasksByTitle(
+      _asListOfMaps(localTask['subtasks']),
+      _asListOfMaps(remoteTask['subtasks']),
+    );
+
+    base['isCompleted'] =
+        _boolValue(localTask['isCompleted']) || _boolValue(remoteTask['isCompleted']);
+
+    base['category'] = _preferNonEmpty(
+      base['category'],
+      older['category'],
+    );
+
+    base['description'] = _preferNonEmpty(
+      base['description'],
+      older['description'],
+    );
+
+    base['reminderAt'] = _preferNewerField(
+      localItem: localTask,
+      remoteItem: remoteTask,
+      field: 'reminderAt',
+    );
+    base['repeatFrequency'] = _preferNewerField(
+      localItem: localTask,
+      remoteItem: remoteTask,
+      field: 'repeatFrequency',
+    );
+    base['customRepeatDays'] = _preferNewerField(
+      localItem: localTask,
+      remoteItem: remoteTask,
+      field: 'customRepeatDays',
+    );
+
+    base['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+
+    return base;
+  }
+
+  List<Map<String, dynamic>> _mergeSubtasksByTitle(
+    List<Map<String, dynamic>> localSubtasks,
+    List<Map<String, dynamic>> remoteSubtasks,
+  ) {
+    final Map<String, Map<String, dynamic>> merged = {};
+
+    for (final Map<String, dynamic> subtask in remoteSubtasks) {
+      final String key = _normalizedString(subtask['title']);
+      merged[key.isEmpty ? _fallbackItemKey(subtask) : key] =
+          Map<String, dynamic>.from(subtask);
+    }
+
+    for (final Map<String, dynamic> localSubtask in localSubtasks) {
+      final String key = _normalizedString(localSubtask['title']);
+      final String safeKey = key.isEmpty ? _fallbackItemKey(localSubtask) : key;
+      final Map<String, dynamic>? remoteSubtask = merged[safeKey];
+
+      if (remoteSubtask == null) {
+        merged[safeKey] = Map<String, dynamic>.from(localSubtask);
+        continue;
+      }
+
+      final bool localNewer = _itemUpdatedAt(localSubtask).isAfter(
+        _itemUpdatedAt(remoteSubtask),
+      );
+
+      final Map<String, dynamic> base = Map<String, dynamic>.from(
+        localNewer ? localSubtask : remoteSubtask,
+      );
+
+      base['isCompleted'] = _boolValue(localSubtask['isCompleted']) ||
+          _boolValue(remoteSubtask['isCompleted']);
+      base['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      merged[safeKey] = base;
+    }
+
+    final List<Map<String, dynamic>> output = merged.values.toList();
+    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
+    return output;
+  }
+
+  List<Map<String, dynamic>> _mergeExactDuplicateOnly(
+    List<Map<String, dynamic>> localItems,
+    List<Map<String, dynamic>> remoteItems, {
+    required String Function(Map<String, dynamic> item) keyBuilder,
+  }) {
+    final Map<String, Map<String, dynamic>> merged = {};
+
+    for (final Map<String, dynamic> item in remoteItems) {
+      merged[keyBuilder(item)] = Map<String, dynamic>.from(item);
+    }
+
+    for (final Map<String, dynamic> item in localItems) {
+      final String key = keyBuilder(item);
+      final Map<String, dynamic>? existing = merged[key];
+
+      if (existing == null) {
+        merged[key] = Map<String, dynamic>.from(item);
+        continue;
+      }
+
+      final bool localNewer = _itemUpdatedAt(item).isAfter(
+        _itemUpdatedAt(existing),
+      );
+
+      merged[key] = Map<String, dynamic>.from(localNewer ? item : existing);
+    }
+
+    final List<Map<String, dynamic>> output = merged.values.toList();
+    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
+    return output;
+  }
+
+  List<String> _mergeStringList(
+    List<dynamic> localList,
+    List<dynamic> remoteList, {
+    required bool removeLegacyMyTasks,
+  }) {
+    final Set<String> seen = {};
+    final List<String> output = [];
+
+    void addValue(dynamic value) {
+      final String text = value.toString().trim();
+      if (text.isEmpty) {
+        return;
+      }
+      if (removeLegacyMyTasks && text == 'My Tasks') {
+        return;
+      }
+      final String key = text.toLowerCase();
+      if (seen.add(key)) {
+        output.add(text);
       }
     }
 
-    final List<T> output = merged.values.toList();
+    addValue(AppData.defaultCategory);
+
+    for (final dynamic value in localList) {
+      addValue(value);
+    }
+
+    for (final dynamic value in remoteList) {
+      addValue(value);
+    }
 
     output.sort((a, b) {
-      return getUpdatedAt(b).compareTo(getUpdatedAt(a));
+      if (a == AppData.defaultCategory) {
+        return -1;
+      }
+      if (b == AppData.defaultCategory) {
+        return 1;
+      }
+      return a.toLowerCase().compareTo(b.toLowerCase());
     });
 
     return output;
+  }
+
+  String _mergeMessage({
+    required AppData localData,
+    required AppData remoteData,
+    required AppData mergedData,
+  }) {
+    return 'Sync complete.';
+  }
+
+  int _totalItemCount(AppData data) {
+    final Map<String, dynamic> json = data.toJson();
+    return _asList(json['tasks']).length +
+        _asList(json['journalEntries']).length +
+        _asList(json['watchItems']).length +
+        _asList(json['groceryItems']).length;
+  }
+
+  String _taskTitleKey(Map<String, dynamic> item) {
+    return 'task:${_normalizedString(item['title'])}';
+  }
+
+  String _journalExactKey(Map<String, dynamic> item) {
+    final String title = _normalizedString(item['title']);
+    final String body = _normalizedString(item['body'] ?? item['content']);
+    final String date = _normalizedString(
+      item['date'] ?? item['entryDate'] ?? item['createdAt'],
+    );
+
+    return 'journal:$title|$body|$date';
+  }
+
+  String _watchExactKey(Map<String, dynamic> item) {
+    final List<String> parts = item.keys.toList()..sort();
+    return 'watch:${parts.map((key) => '$key=${item[key]}').join('|')}';
+  }
+
+  String _genericExactKey(Map<String, dynamic> item) {
+    final List<String> parts = item.keys.toList()..sort();
+    return 'generic:${parts.map((key) => '$key=${item[key]}').join('|')}';
+  }
+
+  String _fallbackItemKey(Map<String, dynamic> item) {
+    final String id = item['id']?.toString() ?? '';
+    if (id.isNotEmpty) {
+      return 'id:$id';
+    }
+
+    return _genericExactKey(item);
+  }
+
+  int _compareByUpdatedAtOrCreatedAtDescending(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    return _itemUpdatedAt(b).compareTo(_itemUpdatedAt(a));
+  }
+
+  DateTime _itemUpdatedAt(Map<String, dynamic> item) {
+    return _parseDateTime(item['updatedAt']) ??
+        _parseDateTime(item['createdAt']) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+
+  dynamic _preferNewerField({
+    required Map<String, dynamic> localItem,
+    required Map<String, dynamic> remoteItem,
+    required String field,
+  }) {
+    final bool localNewer = _itemUpdatedAt(localItem).isAfter(
+      _itemUpdatedAt(remoteItem),
+    );
+
+    final dynamic preferred = localNewer ? localItem[field] : remoteItem[field];
+    final dynamic fallback = localNewer ? remoteItem[field] : localItem[field];
+
+    return preferred ?? fallback;
+  }
+
+  dynamic _preferNonEmpty(dynamic preferred, dynamic fallback) {
+    final String preferredText = preferred?.toString().trim() ?? '';
+    if (preferredText.isNotEmpty) {
+      return preferred;
+    }
+
+    return fallback;
+  }
+
+  bool _boolValue(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+
+    return value.toString().toLowerCase() == 'true';
+  }
+
+  int _maxInt(dynamic a, dynamic b) {
+    final int first = int.tryParse(a?.toString() ?? '') ?? 0;
+    final int second = int.tryParse(b?.toString() ?? '') ?? 0;
+    return first > second ? first : second;
+  }
+
+  List<dynamic> _asList(dynamic value) {
+    if (value is List) {
+      return value;
+    }
+
+    return [];
+  }
+
+  List<Map<String, dynamic>> _asListOfMaps(dynamic value) {
+    if (value is! List) {
+      return [];
+    }
+
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  String _normalizedString(dynamic value) {
+    return value?.toString().trim().toLowerCase() ?? '';
+  }
+
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    return DateTime.tryParse(value.toString())?.toUtc();
   }
 }

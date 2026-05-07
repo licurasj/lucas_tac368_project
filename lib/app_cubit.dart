@@ -5,14 +5,18 @@ import 'app_data.dart';
 import 'app_state.dart';
 import 'app_storage.dart';
 import 'drive_sync_service.dart';
+import 'grocery_item.dart';
 import 'journal_entry.dart';
+import 'sync_result.dart';
 import 'task_item.dart';
 import 'watch_item.dart';
-import 'grocery_item.dart';
 
 class AppCubit extends Cubit<AppState> {
   final AppStorage storage;
   final DriveSyncService driveSyncService;
+
+  bool _isAutoSyncing = false;
+  bool _needsAnotherAutoSync = false;
 
   AppCubit({
     required this.storage,
@@ -20,33 +24,33 @@ class AppCubit extends Cubit<AppState> {
     required String deviceId,
   }) : super(AppState.initial(deviceId));
 
-  // Future<void> loadData() async {
-  //   emit(state.copyWith(isLoading: true, clearError: true));
+  void _clearSyncMessageSoon(
+    String message, {
+    Duration delay = const Duration(milliseconds: 900),
+  }) {
+    Future<void>.delayed(delay, () {
+      if (isClosed) {
+        return;
+      }
 
-  //   try {
-  //     final AppData loadedData = await storage.loadAppData();
-
-  //     emit(
-  //       state.copyWith(
-  //         data: loadedData,
-  //         isLoading: false,
-  //         clearError: true,
-  //       ),
-  //     );
-
-  //     await syncWithDrive();
-  //   } catch (_) {
-  //     emit(
-  //       state.copyWith(
-  //         isLoading: false,
-  //         errorMessage: 'Could not load local data.',
-  //       ),
-  //     );
-  //   }
-  // }
+      if (state.syncMessage == message && !state.isSyncing) {
+        emit(
+          state.copyWith(
+            clearSyncMessage: true,
+          ),
+        );
+      }
+    });
+  }
 
   Future<void> loadData() async {
-    emit(state.copyWith(isLoading: true, clearError: true));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearError: true,
+        clearSyncMessage: true,
+      ),
+    );
 
     try {
       final AppData loadedData = await storage.loadAppData();
@@ -55,13 +59,65 @@ class AppCubit extends Cubit<AppState> {
         state.copyWith(
           data: loadedData,
           isLoading: false,
+          isGoogleSignedIn: driveSyncService.isSignedIn,
           clearError: true,
         ),
       );
+
+      final bool restoredSignIn =
+          driveSyncService.isSignedIn ||
+          await driveSyncService.tryRestorePreviousSignIn();
+
+      if (!restoredSignIn) {
+        emit(
+          state.copyWith(
+            isGoogleSignedIn: false,
+          ),
+        );
+        return;
+      }
+
+      emit(
+        state.copyWith(
+          isGoogleSignedIn: true,
+          isSyncing: true,
+          clearSyncMessage: true,
+          clearError: true,
+        ),
+      );
+
+      final SyncResult result = await driveSyncService.sync(
+        localData: loadedData,
+      );
+
+      if (result.success && result.syncedData != null) {
+        await _saveData(result.syncedData!);
+
+        emit(
+          state.copyWith(
+            data: result.syncedData!,
+            isSyncing: false,
+            isGoogleSignedIn: driveSyncService.isSignedIn,
+            lastSyncedAt: DateTime.now().toUtc(),
+            clearSyncMessage: true,
+            clearError: true,
+          ),
+        );
+      } else {
+        emit(
+          state.copyWith(
+            isSyncing: false,
+            isGoogleSignedIn: driveSyncService.isSignedIn,
+            syncMessage: result.message,
+          ),
+        );
+        _clearSyncMessageSoon(result.message);
+      }
     } catch (_) {
       emit(
         state.copyWith(
           isLoading: false,
+          isSyncing: false,
           errorMessage: 'Could not load local data.',
         ),
       );
@@ -92,69 +148,182 @@ class AppCubit extends Cubit<AppState> {
           errorMessage: 'Could not save local data.',
         ),
       );
+      return;
     }
+
+    await _autoPushLocalChange();
   }
 
-  Future<void> signInToGoogle() async {
+  Future<void> _autoPushLocalChange() async {
+    if (!driveSyncService.isSignedIn) {
+      return;
+    }
+
+    if (_isAutoSyncing) {
+      _needsAnotherAutoSync = true;
+      return;
+    }
+
+    _isAutoSyncing = true;
+
     emit(
       state.copyWith(
         isSyncing: true,
-        clearError: true,
+        isGoogleSignedIn: true,
         clearSyncMessage: true,
-      ),
-    );
-
-    final bool signedIn = await driveSyncService.signIn();
-
-    emit(
-      state.copyWith(
-        isSyncing: false,
-        syncMessage: signedIn
-            ? 'Signed in to Google. You can sync now.'
-            : 'Google sign-in failed or was cancelled.',
-      ),
-    );
-  }
-
-  Future<void> signOutOfGoogle() async {
-    await driveSyncService.signOut();
-
-    emit(
-      state.copyWith(
-        syncMessage: 'Signed out of Google.',
-      ),
-    );
-  }
-
-  Future<void> syncWithDrive() async {
-    emit(
-      state.copyWith(
-        isSyncing: true,
         clearError: true,
-        clearSyncMessage: true,
       ),
     );
 
-    final result = await driveSyncService.sync(localData: state.data);
+    String? failureMessage;
 
-    if (result.success && result.syncedData != null) {
-      await _saveData(result.syncedData!);
+    do {
+      _needsAnotherAutoSync = false;
 
+      final SyncResult result = await driveSyncService.pushLocalToDrive(
+        localData: state.data,
+      );
+
+      if (result.success && result.syncedData != null) {
+        await _saveData(result.syncedData!);
+
+        emit(
+          state.copyWith(
+            data: result.syncedData!,
+            isGoogleSignedIn: true,
+            lastSyncedAt: DateTime.now().toUtc(),
+            clearError: true,
+          ),
+        );
+      } else {
+        failureMessage = result.message;
+        emit(
+          state.copyWith(
+            isGoogleSignedIn: driveSyncService.isSignedIn,
+            syncMessage: result.message,
+          ),
+        );
+      }
+    } while (_needsAnotherAutoSync);
+
+    _isAutoSyncing = false;
+
+    if (failureMessage == null) {
       emit(
         state.copyWith(
-          data: result.syncedData!,
           isSyncing: false,
-          syncMessage: result.message,
-          lastSyncedAt: DateTime.now().toUtc(),
+          isGoogleSignedIn: driveSyncService.isSignedIn,
+          clearSyncMessage: true,
         ),
       );
     } else {
       emit(
         state.copyWith(
           isSyncing: false,
+          isGoogleSignedIn: driveSyncService.isSignedIn,
+          syncMessage: failureMessage,
+        ),
+      );
+      _clearSyncMessageSoon(failureMessage);
+    }
+  }
+
+  Future<void> signInToGoogle() async {
+    if (driveSyncService.isSignedIn || state.isGoogleSignedIn) {
+      await signOutOfGoogle();
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        isSyncing: true,
+        clearSyncMessage: true,
+        clearError: true,
+      ),
+    );
+
+    final bool signedIn = await driveSyncService.signIn();
+
+    if (!signedIn) {
+      const String message = 'Google sign-in failed or was cancelled.';
+
+      emit(
+        state.copyWith(
+          isSyncing: false,
+          isGoogleSignedIn: false,
+          syncMessage: message,
+        ),
+      );
+      _clearSyncMessageSoon(message);
+      return;
+    }
+
+    const String message = 'Signed in.';
+
+    emit(
+      state.copyWith(
+        isSyncing: false,
+        isGoogleSignedIn: true,
+        syncMessage: message,
+        clearError: true,
+      ),
+    );
+
+    _clearSyncMessageSoon(message);
+  }
+
+  Future<void> signOutOfGoogle() async {
+    await driveSyncService.signOut();
+
+    const String message = 'Signed out.';
+
+    emit(
+      state.copyWith(
+        isGoogleSignedIn: false,
+        isSyncing: false,
+        syncMessage: message,
+        clearError: true,
+      ),
+    );
+    _clearSyncMessageSoon(message);
+  }
+
+  Future<void> syncWithDrive() async {
+    emit(
+      state.copyWith(
+        isSyncing: true,
+        clearSyncMessage: true,
+        clearError: true,
+      ),
+    );
+
+    final SyncResult result = await driveSyncService.sync(localData: state.data);
+
+    if (result.success && result.syncedData != null) {
+      await _saveData(result.syncedData!);
+
+      const String message = 'Sync complete.';
+
+      emit(
+        state.copyWith(
+          data: result.syncedData!,
+          isSyncing: false,
+          isGoogleSignedIn: driveSyncService.isSignedIn,
+          syncMessage: message,
+          lastSyncedAt: DateTime.now().toUtc(),
+          clearError: true,
+        ),
+      );
+      _clearSyncMessageSoon(message);
+    } else {
+      emit(
+        state.copyWith(
+          isSyncing: false,
+          isGoogleSignedIn: driveSyncService.isSignedIn,
           syncMessage: result.message,
         ),
       );
+      _clearSyncMessageSoon(result.message);
     }
   }
 
@@ -227,8 +396,9 @@ class AppCubit extends Cubit<AppState> {
       return;
     }
 
-    final List<String> updatedCategories =
-        state.data.categories.where((category) => category != categoryName).toList();
+    final List<String> updatedCategories = state.data.categories
+        .where((category) => category != categoryName)
+        .toList();
 
     await _updateAndSave(
       state.data.copyWith(categories: updatedCategories),
@@ -595,7 +765,8 @@ class AppCubit extends Cubit<AppState> {
 
     final DateTime now = DateTime.now().toUtc();
 
-    final List<JournalEntry> updatedEntries = state.data.journalEntries.map((entry) {
+    final List<JournalEntry> updatedEntries =
+        state.data.journalEntries.map((entry) {
       if (entry.id != entryId) {
         return entry;
       }
@@ -732,207 +903,215 @@ class AppCubit extends Cubit<AppState> {
     );
   }
 
-Future<void> addGroceryItem({
-  required String title,
-  required String description,
-  required GrocerySection section,
-  required bool autoAddToNext,
-}) async {
-  if (title.trim().isEmpty) {
-    emit(state.copyWith(errorMessage: 'Grocery item title cannot be empty.'));
-    return;
-  }
-
-  final DateTime now = DateTime.now().toUtc();
-
-  final GroceryItem item = GroceryItem(
-    id: const Uuid().v4(),
-    title: title.trim(),
-    description: description.trim(),
-    section: section,
-    isCompleted: false,
-    autoAddToNext: autoAddToNext,
-    createdAt: now,
-    updatedAt: now,
-  );
-
-  final List<GroceryItem> updatedItems = [
-    ...state.data.groceryItems,
-    item,
-  ];
-
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
-
-Future<void> editGroceryItem({
-  required String itemId,
-  required String title,
-  required String description,
-  required GrocerySection section,
-  required bool autoAddToNext,
-}) async {
-  if (title.trim().isEmpty) {
-    emit(state.copyWith(errorMessage: 'Grocery item title cannot be empty.'));
-    return;
-  }
-
-  final DateTime now = DateTime.now().toUtc();
-
-  final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
-    if (item.id != itemId) {
-      return item;
+  Future<void> addGroceryItem({
+    required String title,
+    required String description,
+    required GrocerySection section,
+    required bool autoAddToNext,
+  }) async {
+    if (title.trim().isEmpty) {
+      emit(state.copyWith(errorMessage: 'Grocery item title cannot be empty.'));
+      return;
     }
 
-    return item.copyWith(
+    final DateTime now = DateTime.now().toUtc();
+
+    final GroceryItem item = GroceryItem(
+      id: const Uuid().v4(),
       title: title.trim(),
       description: description.trim(),
       section: section,
-      autoAddToNext: autoAddToNext,
-      updatedAt: now,
-    );
-  }).toList();
-
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
-
-Future<void> toggleGroceryItemComplete(String itemId) async {
-  final DateTime now = DateTime.now().toUtc();
-
-  final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
-    if (item.id != itemId) {
-      return item;
-    }
-
-    return item.copyWith(
-      isCompleted: !item.isCompleted,
-      updatedAt: now,
-    );
-  }).toList();
-
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
-
-GroceryItem _makeNextTimeCopy(GroceryItem item, DateTime now) {
-  return GroceryItem(
-    id: const Uuid().v4(),
-    title: item.title,
-    description: item.description,
-    section: GrocerySection.nextTime,
-    isCompleted: false,
-    autoAddToNext: item.autoAddToNext,
-    createdAt: now,
-    updatedAt: now,
-  );
-}
-
-bool _alreadyHasNextTimeCopy({
-  required List<GroceryItem> items,
-  required GroceryItem sourceItem,
-}) {
-  return items.any((item) {
-    return item.section == GrocerySection.nextTime &&
-        !item.isCompleted &&
-        item.title.trim().toLowerCase() ==
-            sourceItem.title.trim().toLowerCase();
-  });
-}
-
-Future<void> deleteGroceryItem(String itemId) async {
-  final DateTime now = DateTime.now().toUtc();
-
-  final GroceryItem? itemToDelete = state.data.groceryItems
-      .where((item) => item.id == itemId)
-      .firstOrNull;
-
-  final List<GroceryItem> updatedItems =
-      state.data.groceryItems.where((item) => item.id != itemId).toList();
-
-  if (itemToDelete != null &&
-      itemToDelete.section == GrocerySection.current &&
-      itemToDelete.isCompleted &&
-      itemToDelete.autoAddToNext &&
-      !_alreadyHasNextTimeCopy(
-        items: updatedItems,
-        sourceItem: itemToDelete,
-      )) {
-    updatedItems.add(_makeNextTimeCopy(itemToDelete, now));
-  }
-
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
-
-Future<void> clearCompletedGroceryItems(GrocerySection section) async {
-  final DateTime now = DateTime.now().toUtc();
-  final List<GroceryItem> updatedItems = [];
-
-  for (final GroceryItem item in state.data.groceryItems) {
-    final bool shouldClear = item.section == section && item.isCompleted;
-
-    if (!shouldClear) {
-      updatedItems.add(item);
-      continue;
-    }
-
-    if (item.section == GrocerySection.current &&
-        item.autoAddToNext &&
-        !_alreadyHasNextTimeCopy(
-          items: [...updatedItems, ...state.data.groceryItems],
-          sourceItem: item,
-        )) {
-      updatedItems.add(_makeNextTimeCopy(item, now));
-    }
-  }
-
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
-
-Future<void> moveGroceryItemToCurrent(String itemId) async {
-  final DateTime now = DateTime.now().toUtc();
-
-  final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
-    if (item.id != itemId) {
-      return item;
-    }
-
-    return item.copyWith(
-      section: GrocerySection.current,
       isCompleted: false,
+      autoAddToNext: autoAddToNext,
+      createdAt: now,
       updatedAt: now,
     );
-  }).toList();
 
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
+    final List<GroceryItem> updatedItems = [
+      ...state.data.groceryItems,
+      item,
+    ];
 
-Future<void> moveGroceryItemToNextTime(String itemId) async {
-  final DateTime now = DateTime.now().toUtc();
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
 
-  final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
-    if (item.id != itemId) {
-      return item;
+  Future<void> editGroceryItem({
+    required String itemId,
+    required String title,
+    required String description,
+    required GrocerySection section,
+    required bool autoAddToNext,
+  }) async {
+    if (title.trim().isEmpty) {
+      emit(state.copyWith(errorMessage: 'Grocery item title cannot be empty.'));
+      return;
     }
 
-    return item.copyWith(
+    final DateTime now = DateTime.now().toUtc();
+
+    final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
+      if (item.id != itemId) {
+        return item;
+      }
+
+      return item.copyWith(
+        title: title.trim(),
+        description: description.trim(),
+        section: section,
+        autoAddToNext: autoAddToNext,
+        updatedAt: now,
+      );
+    }).toList();
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  Future<void> toggleGroceryItemComplete(String itemId) async {
+    final DateTime now = DateTime.now().toUtc();
+
+    final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
+      if (item.id != itemId) {
+        return item;
+      }
+
+      return item.copyWith(
+        isCompleted: !item.isCompleted,
+        updatedAt: now,
+      );
+    }).toList();
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  GroceryItem _makeNextTimeCopy(GroceryItem item, DateTime now) {
+    return GroceryItem(
+      id: const Uuid().v4(),
+      title: item.title,
+      description: item.description,
       section: GrocerySection.nextTime,
       isCompleted: false,
+      autoAddToNext: item.autoAddToNext,
+      createdAt: now,
       updatedAt: now,
     );
-  }).toList();
+  }
 
-  await _updateAndSave(
-    state.data.copyWith(groceryItems: updatedItems),
-  );
-}
+  bool _alreadyHasNextTimeCopy({
+    required List<GroceryItem> items,
+    required GroceryItem sourceItem,
+  }) {
+    return items.any((item) {
+      return item.section == GrocerySection.nextTime &&
+          !item.isCompleted &&
+          item.title.trim().toLowerCase() ==
+              sourceItem.title.trim().toLowerCase();
+    });
+  }
+
+  GroceryItem? _findGroceryItem(String itemId) {
+    for (final GroceryItem item in state.data.groceryItems) {
+      if (item.id == itemId) {
+        return item;
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> deleteGroceryItem(String itemId) async {
+    final DateTime now = DateTime.now().toUtc();
+
+    final GroceryItem? itemToDelete = _findGroceryItem(itemId);
+
+    final List<GroceryItem> updatedItems =
+        state.data.groceryItems.where((item) => item.id != itemId).toList();
+
+    if (itemToDelete != null &&
+        itemToDelete.section == GrocerySection.current &&
+        itemToDelete.isCompleted &&
+        itemToDelete.autoAddToNext &&
+        !_alreadyHasNextTimeCopy(
+          items: updatedItems,
+          sourceItem: itemToDelete,
+        )) {
+      updatedItems.add(_makeNextTimeCopy(itemToDelete, now));
+    }
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  Future<void> clearCompletedGroceryItems(GrocerySection section) async {
+    final DateTime now = DateTime.now().toUtc();
+    final List<GroceryItem> updatedItems = [];
+
+    for (final GroceryItem item in state.data.groceryItems) {
+      final bool shouldClear = item.section == section && item.isCompleted;
+
+      if (!shouldClear) {
+        updatedItems.add(item);
+        continue;
+      }
+
+      if (item.section == GrocerySection.current &&
+          item.autoAddToNext &&
+          !_alreadyHasNextTimeCopy(
+            items: [...updatedItems, ...state.data.groceryItems],
+            sourceItem: item,
+          )) {
+        updatedItems.add(_makeNextTimeCopy(item, now));
+      }
+    }
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  Future<void> moveGroceryItemToCurrent(String itemId) async {
+    final DateTime now = DateTime.now().toUtc();
+
+    final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
+      if (item.id != itemId) {
+        return item;
+      }
+
+      return item.copyWith(
+        section: GrocerySection.current,
+        isCompleted: false,
+        updatedAt: now,
+      );
+    }).toList();
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  Future<void> moveGroceryItemToNextTime(String itemId) async {
+    final DateTime now = DateTime.now().toUtc();
+
+    final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
+      if (item.id != itemId) {
+        return item;
+      }
+
+      return item.copyWith(
+        section: GrocerySection.nextTime,
+        isCompleted: false,
+        updatedAt: now,
+      );
+    }).toList();
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
 }

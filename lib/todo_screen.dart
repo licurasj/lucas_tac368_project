@@ -19,8 +19,6 @@ class TodoScreen extends StatefulWidget {
 class _TodoScreenState extends State<TodoScreen> {
   String selectedCategory = AppData.defaultCategory;
 
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
   String _categoryDisplayName(String category) {
     if (category == AppData.defaultCategory) {
       return 'All My Tasks';
@@ -258,10 +256,6 @@ class _TodoScreenState extends State<TodoScreen> {
         );
       },
     );
-
-    // Do not dispose this immediately. On Android, the dialog/text-field route can
-    // still rebuild for a frame while closing, and disposing right away can trigger
-    // "TextEditingController was used after being disposed."
 
     if (!context.mounted) {
       return;
@@ -572,10 +566,6 @@ class _TodoScreenState extends State<TodoScreen> {
         );
       },
     );
-
-    // Keep these alive until the dialog route has fully closed. Disposing local
-    // controllers immediately after pop can still race with Android text-field
-    // teardown during hot restart/keyboard animation.
   }
 
   Future<void> _showSubtaskDialog(
@@ -628,8 +618,6 @@ class _TodoScreenState extends State<TodoScreen> {
         );
       },
     );
-
-    // Intentionally not disposing immediately; see notes in _showTaskDialog.
   }
 
   static String _repeatLabel(RepeatFrequency repeat) {
@@ -988,33 +976,46 @@ class _TodoScreenState extends State<TodoScreen> {
                   categories: categories,
                 ),
                 Expanded(
-                  child: tasks.isEmpty
-                      ? const Center(
-                          child: Text('No tasks here yet.'),
-                        )
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                          children: [
-                            ..._buildTaskSection(
-                              context,
-                              title: 'Today',
-                              tasks: todayTasks,
-                              categories: categories,
-                            ),
-                            ..._buildTaskSection(
-                              context,
-                              title: 'Tomorrow',
-                              tasks: tomorrowTasks,
-                              categories: categories,
-                            ),
-                            ..._buildTaskSection(
-                              context,
-                              title: 'Later',
-                              tasks: laterTasks,
-                              categories: categories,
-                            ),
-                          ],
-                        ),
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      await context.read<AppCubit>().syncWithDrive();
+                    },
+                    child: tasks.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                            children: const [
+                              SizedBox(height: 240),
+                              Center(
+                                child: Text('No tasks here yet.'),
+                              ),
+                            ],
+                          )
+                        : ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                            children: [
+                              ..._buildTaskSection(
+                                context,
+                                title: 'Today',
+                                tasks: todayTasks,
+                                categories: categories,
+                              ),
+                              ..._buildTaskSection(
+                                context,
+                                title: 'Tomorrow',
+                                tasks: tomorrowTasks,
+                                categories: categories,
+                              ),
+                              ..._buildTaskSection(
+                                context,
+                                title: 'Later',
+                                tasks: laterTasks,
+                                categories: categories,
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
                 const Divider(height: 1),
                 Padding(
@@ -1051,7 +1052,6 @@ class _TodoScreenState extends State<TodoScreen> {
             );
 
             return Scaffold(
-              key: _scaffoldKey,
               backgroundColor: const Color(0xFFF4F8FF),
               appBar: AppBar(
                 title: const Text('Tasks'),
