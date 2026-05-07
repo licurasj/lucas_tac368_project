@@ -254,13 +254,27 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int selectedIndex = 0;
 
-  final List<Widget> screens = const [
-    HomeScreen(),
-    TodoScreen(),
-    GroceryScreen(),
-    JournalScreen(),
-    WatchlistScreen(),
-  ];
+  void _selectPage(int index) {
+    setState(() {
+      selectedIndex = index;
+    });
+  }
+
+  Widget _screenForIndex(int index) {
+    switch (index) {
+      case 1:
+        return const TodoScreen();
+      case 2:
+        return const GroceryScreen();
+      case 3:
+        return const JournalScreen();
+      case 4:
+        return const WatchlistScreen();
+      case 0:
+      default:
+        return HomeScreen(onNavigate: _selectPage);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -279,14 +293,10 @@ class _MainShellState extends State<MainShell> {
         }
       },
       child: Scaffold(
-        body: screens[selectedIndex],
+        body: _screenForIndex(selectedIndex),
         bottomNavigationBar: NavigationBar(
           selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            setState(() {
-              selectedIndex = index;
-            });
-          },
+          onDestinationSelected: _selectPage,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),

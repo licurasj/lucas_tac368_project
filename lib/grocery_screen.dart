@@ -179,33 +179,25 @@ class GroceryScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: () {
-                    _showGroceryDialog(
-                      context,
-                      initialSection: section,
-                    );
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add'),
-                ),
               ],
             ),
           ),
           const Divider(height: 1),
           Expanded(
-            child: items.isEmpty
-                ? Center(
-                    child: Text(emptyText),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final GroceryItem item = items[index];
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: items.isEmpty
+                      ? Center(
+                          child: Text(emptyText),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            final GroceryItem item = items[index];
 
-                      return Card(
+                            return Card(
                         elevation: 0,
                         color: Theme.of(context).colorScheme.surface,
                         shape: RoundedRectangleBorder(
@@ -307,29 +299,56 @@ class GroceryScreen extends StatelessWidget {
                       );
                     },
                   ),
+                ),
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton(
+                    shape: const CircleBorder(),
+                    backgroundColor: AppColors.logoBlue,
+                    foregroundColor: Colors.white,
+                    heroTag: 'add_grocery_${section.name}',
+                    onPressed: () {
+                      _showGroceryDialog(
+                        context,
+                        initialSection: section,
+                      );
+                    },
+                    tooltip: 'Add grocery item',
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+              ],
+            ),
           ),
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  '$tickedCount ticked',
-                  style: const TextStyle(
-                    color: AppColors.mutedText,
-                  ),
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: tickedCount > 0
-                      ? () {
-                          context
-                              .read<AppCubit>()
-                              .clearCompletedGroceryItems(section);
-                        }
-                      : null,
-                  icon: const Icon(Icons.cleaning_services_outlined),
-                  label: const Text('Clear Ticked'),
+                Row(
+                  children: [
+                    Text(
+                      '$tickedCount ticked',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodySmall?.color ??
+                            AppColors.mutedText,
+                      ),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: tickedCount > 0
+                          ? () {
+                              context
+                                  .read<AppCubit>()
+                                  .clearCompletedGroceryItems(section);
+                            }
+                          : null,
+                      icon: const Icon(Icons.cleaning_services_outlined),
+                      label: const Text('Clear Ticked'),
+                    ),
+                  ],
                 ),
               ],
             ),

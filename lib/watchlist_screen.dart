@@ -246,9 +246,13 @@ class WatchlistScreen extends StatelessWidget {
             title: const Text('Watch/Read List'),
           ),
           floatingActionButton: FloatingActionButton(
+                    shape: const CircleBorder(),
+                    backgroundColor: AppColors.logoBlue,
+                    foregroundColor: Colors.white,
             onPressed: () {
               _showWatchItemDialog(context);
             },
+            tooltip: 'Add watch/read item',
             child: const Icon(Icons.add),
           ),
           body: RefreshIndicator(

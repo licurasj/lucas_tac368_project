@@ -307,9 +307,13 @@ class _JournalScreenState extends State<JournalScreen> {
             title: const Text('Journal'),
           ),
           floatingActionButton: FloatingActionButton(
+                    shape: const CircleBorder(),
+                    backgroundColor: AppColors.logoBlue,
+                    foregroundColor: Colors.white,
             onPressed: () {
               _showJournalDialog(context);
             },
+            tooltip: 'Add journal entry',
             child: const Icon(Icons.add),
           ),
           body: RefreshIndicator(

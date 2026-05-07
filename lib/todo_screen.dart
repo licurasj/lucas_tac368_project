@@ -187,27 +187,10 @@ class _TodoScreenState extends State<TodoScreen> {
               style: TextStyle(
                 fontSize: isNarrow ? 22 : 26,
                 fontWeight: FontWeight.bold,
-                color: AppColors.darkBlue,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          if (isNarrow)
-            IconButton.filled(
-              onPressed: () {
-                _showTaskDialog(context, categories);
-              },
-              icon: const Icon(Icons.add),
-              tooltip: 'Add task',
-            )
-          else
-            FilledButton.icon(
-              onPressed: () {
-                _showTaskDialog(context, categories);
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Task'),
-            ),
         ],
       ),
     );
@@ -956,74 +939,100 @@ class _TodoScreenState extends State<TodoScreen> {
                   categories: categories,
                 ),
                 Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      await context.read<AppCubit>().syncWithDrive();
-                    },
-                    child: tasks.isEmpty
-                        ? ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                            children: const [
-                              SizedBox(height: 240),
-                              Center(
-                                child: Text('No tasks here yet.'),
-                              ),
-                            ],
-                          )
-                        : ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                            children: [
-                              ..._buildTaskSection(
-                                context,
-                                title: 'Today',
-                                tasks: todayTasks,
-                                categories: categories,
-                              ),
-                              ..._buildTaskSection(
-                                context,
-                                title: 'Tomorrow',
-                                tasks: tomorrowTasks,
-                                categories: categories,
-                              ),
-                              ..._buildTaskSection(
-                                context,
-                                title: 'Later',
-                                tasks: laterTasks,
-                                categories: categories,
-                              ),
-                            ],
-                          ),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: RefreshIndicator(
+                          onRefresh: () async {
+                            await context.read<AppCubit>().syncWithDrive();
+                          },
+                          child: tasks.isEmpty
+                              ? ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 96),
+                                  children: const [
+                                    SizedBox(height: 240),
+                                    Center(
+                                      child: Text('No tasks here yet.'),
+                                    ),
+                                  ],
+                                )
+                              : ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 96),
+                                  children: [
+                                    ..._buildTaskSection(
+                                      context,
+                                      title: 'Today',
+                                      tasks: todayTasks,
+                                      categories: categories,
+                                    ),
+                                    ..._buildTaskSection(
+                                      context,
+                                      title: 'Tomorrow',
+                                      tasks: tomorrowTasks,
+                                      categories: categories,
+                                    ),
+                                    ..._buildTaskSection(
+                                      context,
+                                      title: 'Later',
+                                      tasks: laterTasks,
+                                      categories: categories,
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 18,
+                        bottom: 18,
+                        child: FloatingActionButton(
+                    shape: const CircleBorder(),
+                    backgroundColor: AppColors.logoBlue,
+                    foregroundColor: Colors.white,
+                          onPressed: () {
+                            _showTaskDialog(context, categories);
+                          },
+                          tooltip: 'Add task',
+                          child: const Icon(Icons.add),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(height: 1),
                 Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: Text(
-                          '$completedTaskCount ticked',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.mutedText,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$completedTaskCount ticked',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(context).textTheme.bodySmall?.color ??
+                                    AppColors.mutedText,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: completedTaskCount > 0
-                            ? () {
-                                context
-                                    .read<AppCubit>()
-                                    .clearCompletedTasks(activeCategory);
-                              }
-                            : null,
-                        icon: const Icon(
-                          Icons.cleaning_services_outlined,
-                        ),
-                        label: Text(isNarrow ? 'Clear' : 'Clear Ticked'),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: completedTaskCount > 0
+                                ? () {
+                                    context
+                                        .read<AppCubit>()
+                                        .clearCompletedTasks(activeCategory);
+                                  }
+                                : null,
+                            icon: const Icon(
+                              Icons.cleaning_services_outlined,
+                            ),
+                            label: Text(isNarrow ? 'Clear' : 'Clear Ticked'),
+                          ),
+                        ],
                       ),
                     ],
                   ),

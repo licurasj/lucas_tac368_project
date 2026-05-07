@@ -6,37 +6,62 @@ import 'app_state.dart';
 import 'app_colors.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final ValueChanged<int>? onNavigate;
+
+  const HomeScreen({
+    super.key,
+    this.onNavigate,
+  });
 
   Widget _summaryCard({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required String value,
+    required VoidCallback onTap,
   }) {
+    final BorderRadius borderRadius = BorderRadius.circular(6);
+
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            Icon(icon, size: 34),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: borderRadius,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(icon, size: 34),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                Text(title),
-              ],
-            ),
-          ],
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _openPage(int index) {
+    onNavigate?.call(index);
   }
 
   @override
@@ -87,32 +112,53 @@ class HomeScreen extends StatelessWidget {
               return context.read<AppCubit>().syncWithDrive();
             },
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 _summaryCard(
+                  context: context,
                   icon: Icons.pending_actions,
                   title: 'Pending Tasks',
                   value: '${state.pendingTaskCount}',
+                  onTap: () {
+                    _openPage(1);
+                  },
                 ),
                 _summaryCard(
+                  context: context,
                   icon: Icons.done_all,
                   title: 'Completed Tasks',
                   value: '${state.completedTaskCount}',
+                  onTap: () {
+                    _openPage(1);
+                  },
                 ),
                 _summaryCard(
+                  context: context,
                   icon: Icons.book,
                   title: 'Journal Entries',
                   value: '${state.data.journalEntries.length}',
+                  onTap: () {
+                    _openPage(3);
+                  },
                 ),
                 _summaryCard(
+                  context: context,
                   icon: Icons.movie,
                   title: 'Watch/Read Items',
                   value: '${state.data.watchItems.length}',
+                  onTap: () {
+                    _openPage(4);
+                  },
                 ),
                 _summaryCard(
+                  context: context,
                   icon: Icons.shopping_cart,
                   title: 'Grocery Items',
                   value: '${state.data.groceryItems.length}',
+                  onTap: () {
+                    _openPage(2);
+                  },
                 ),
                 const SizedBox(height: 12),
                 Card(
@@ -121,13 +167,15 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Google Drive Sync',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.darkBlue,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: state.isDarkMode
+                                    ? AppColors.darkText
+                                    : AppColors.darkBlue,
+                              ),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -137,17 +185,11 @@ class HomeScreen extends StatelessWidget {
                                   ? 'Not synced yet.'
                                   : 'Last synced: ${state.lastSyncedAt!.toLocal()}',
                         ),
-
-                        // Only show syncMessage when NOT currently syncing.
-                        // This prevents duplicate "Syncing..." text.
                         if (!state.isSyncing && state.syncMessage != null) ...[
                           const SizedBox(height: 8),
                           Text(state.syncMessage!),
                         ],
-
                         const SizedBox(height: 12),
-
-                        // This button is ONLY for login/logout.
                         OutlinedButton.icon(
                           onPressed: state.isSyncing
                               ? null
@@ -165,10 +207,7 @@ class HomeScreen extends StatelessWidget {
                             state.isGoogleSignedIn ? 'Log out' : 'Sign in with Google',
                           ),
                         ),
-
                         const SizedBox(height: 8),
-
-                        // This button is ONLY for manual sync.
                         FilledButton.icon(
                           onPressed: state.isSyncing
                               ? null
