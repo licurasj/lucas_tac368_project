@@ -211,6 +211,144 @@ class AppCubit extends Cubit<AppState> {
     return categoryName.trim().toLowerCase();
   }
 
+  int _daysInMonth(int year, int month) {
+    return DateTime(year, month + 1, 0).day;
+  }
+
+  DateTime _clampDateTime({
+    required int year,
+    required int month,
+    required int day,
+    required int hour,
+    required int minute,
+    required int second,
+    required int millisecond,
+    required int microsecond,
+  }) {
+    final int maxDay = _daysInMonth(year, month);
+    final int clampedDay = day > maxDay ? maxDay : day;
+
+    return DateTime(
+      year,
+      month,
+      clampedDay,
+      hour,
+      minute,
+      second,
+      millisecond,
+      microsecond,
+    );
+  }
+
+  DateTime? _advanceReminderOnce(TaskItem task, DateTime localReminder) {
+    switch (task.repeatFrequency) {
+      case RepeatFrequency.none:
+        return null;
+      case RepeatFrequency.daily:
+        return localReminder.add(const Duration(days: 1));
+      case RepeatFrequency.weekly:
+        return localReminder.add(const Duration(days: 7));
+      case RepeatFrequency.monthly:
+        return _clampDateTime(
+          year: localReminder.year,
+          month: localReminder.month + 1,
+          day: localReminder.day,
+          hour: localReminder.hour,
+          minute: localReminder.minute,
+          second: localReminder.second,
+          millisecond: localReminder.millisecond,
+          microsecond: localReminder.microsecond,
+        );
+      case RepeatFrequency.yearly:
+        return _clampDateTime(
+          year: localReminder.year + 1,
+          month: localReminder.month,
+          day: localReminder.day,
+          hour: localReminder.hour,
+          minute: localReminder.minute,
+          second: localReminder.second,
+          millisecond: localReminder.millisecond,
+          microsecond: localReminder.microsecond,
+        );
+      case RepeatFrequency.custom:
+        final int? customDays = task.customRepeatDays;
+
+        if (customDays == null || customDays <= 0) {
+          return null;
+        }
+
+        return localReminder.add(Duration(days: customDays));
+    }
+  }
+
+  DateTime? _nextReminderForTask(TaskItem task, DateTime now) {
+    if (task.reminderAt == null || task.repeatFrequency == RepeatFrequency.none) {
+      return null;
+    }
+
+    DateTime? nextLocalReminder = _advanceReminderOnce(
+      task,
+      task.reminderAt!.toLocal(),
+    );
+
+    // If the completed reminder is old, keep advancing by the same repeat gap
+    // until the next generated instance is actually in the future.
+    int safetyCounter = 0;
+    while (nextLocalReminder != null &&
+        !nextLocalReminder.toUtc().isAfter(now) &&
+        safetyCounter < 1000) {
+      nextLocalReminder = _advanceReminderOnce(task, nextLocalReminder);
+      safetyCounter++;
+    }
+
+    return nextLocalReminder?.toUtc();
+  }
+
+  List<SubtaskItem> _copySubtasksForRepeatedTask(
+    List<SubtaskItem> subtasks,
+    DateTime now,
+    String newTaskId,
+  ) {
+    return subtasks.map((subtask) {
+      return SubtaskItem(
+        id: '$newTaskId-subtask-${subtask.id}',
+        title: subtask.title,
+        isCompleted: false,
+        createdAt: now,
+        updatedAt: now,
+      );
+    }).toList();
+  }
+
+  TaskItem? _makeNextRepeatedTask(TaskItem completedTask, DateTime now) {
+    final DateTime? nextReminder = _nextReminderForTask(completedTask, now);
+
+    if (nextReminder == null) {
+      return null;
+    }
+
+    final String nextTaskId =
+        'repeat-${completedTask.id}-${nextReminder.millisecondsSinceEpoch}';
+
+    return TaskItem(
+      id: nextTaskId,
+      title: completedTask.title,
+      description: completedTask.description,
+      isCompleted: false,
+      category: completedTask.category,
+      subtasks: _copySubtasksForRepeatedTask(
+        completedTask.subtasks,
+        now,
+        nextTaskId,
+      ),
+      reminderAt: nextReminder,
+      repeatFrequency: completedTask.repeatFrequency,
+      customRepeatDays: completedTask.customRepeatDays,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
   Future<void> _updateAndSave(AppData data) async {
     final AppData updatedData = data
         .copyWith(
@@ -705,11 +843,63 @@ class AppCubit extends Cubit<AppState> {
     );
   }
 
+  Future<void> clearCompletedTask(String taskId) async {
+    TaskItem? completedTask;
+
+    for (final TaskItem task in state.data.tasks) {
+      if (task.id == taskId) {
+        completedTask = task;
+        break;
+      }
+    }
+
+    if (completedTask == null) {
+      return;
+    }
+
+    if (!completedTask.isCompleted) {
+      emit(
+        state.copyWith(
+          errorMessage: 'Only completed tasks can be cleared.',
+        ),
+      );
+      return;
+    }
+
+    final DateTime now = DateTime.now().toUtc();
+    final TaskItem? nextRepeatedTask = _makeNextRepeatedTask(completedTask, now);
+
+    final List<TaskItem> updatedTasks = state.data.tasks
+        .where((task) => task.id != taskId)
+        .toList();
+
+    if (nextRepeatedTask != null) {
+      final bool alreadyHasNextTask = updatedTasks.any(
+        (task) => task.id == nextRepeatedTask.id,
+      );
+
+      if (!alreadyHasNextTask) {
+        updatedTasks.add(nextRepeatedTask);
+      }
+    }
+
+    await _updateAndSave(
+      state.data.copyWith(
+        tasks: updatedTasks,
+        taskTombstones: _upsertTombstone(
+          state.data.taskTombstones,
+          _makeTombstone(taskId, now),
+        ),
+      ),
+    );
+  }
+
   Future<void> clearCompletedTasks(String category) async {
     final DateTime now = DateTime.now().toUtc();
     List<SyncTombstone> updatedTombstones = state.data.taskTombstones;
 
     final List<TaskItem> updatedTasks = [];
+    final Set<String> taskIdsAlreadyAdded = {};
 
     for (final TaskItem task in state.data.tasks) {
       final bool shouldClear = task.isCompleted &&
@@ -717,6 +907,7 @@ class AppCubit extends Cubit<AppState> {
 
       if (!shouldClear) {
         updatedTasks.add(task);
+        taskIdsAlreadyAdded.add(task.id);
         continue;
       }
 
@@ -724,6 +915,14 @@ class AppCubit extends Cubit<AppState> {
         updatedTombstones,
         _makeTombstone(task.id, now),
       );
+
+      final TaskItem? nextRepeatedTask = _makeNextRepeatedTask(task, now);
+
+      if (nextRepeatedTask != null &&
+          !taskIdsAlreadyAdded.contains(nextRepeatedTask.id)) {
+        updatedTasks.add(nextRepeatedTask);
+        taskIdsAlreadyAdded.add(nextRepeatedTask.id);
+      }
     }
 
     await _updateAndSave(
@@ -1272,6 +1471,33 @@ class AppCubit extends Cubit<AppState> {
         updatedAt: now,
       );
     }).toList();
+
+    await _updateAndSave(
+      state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  Future<void> moveAllNextTimeGroceryItemsToCurrent() async {
+    final DateTime now = DateTime.now().toUtc();
+    bool changed = false;
+
+    final List<GroceryItem> updatedItems = state.data.groceryItems.map((item) {
+      if (item.section != GrocerySection.nextTime) {
+        return item;
+      }
+
+      changed = true;
+
+      return item.copyWith(
+        section: GrocerySection.current,
+        isCompleted: false,
+        updatedAt: now,
+      );
+    }).toList();
+
+    if (!changed) {
+      return;
+    }
 
     await _updateAndSave(
       state.data.copyWith(groceryItems: updatedItems),

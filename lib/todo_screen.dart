@@ -733,40 +733,59 @@ class _TodoScreenState extends State<TodoScreen> {
               ),
           ],
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') {
-              _showTaskDialog(
-                context,
-                categories,
-                task: task,
-              );
-            }
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (task.isCompleted)
+              IconButton(
+                tooltip: loc.clear,
+                iconSize: 22,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 48,
+                  height: 48,
+                ),
+                onPressed: () {
+                  context.read<AppCubit>().clearCompletedTask(task.id);
+                },
+                icon: const Icon(Icons.cleaning_services_outlined),
+              ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _showTaskDialog(
+                    context,
+                    categories,
+                    task: task,
+                  );
+                }
 
-            if (value == 'delete') {
-              context.read<AppCubit>().deleteTask(task.id);
-            }
-          },
-          itemBuilder: (context) {
-            return const [
-              PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: Icon(Icons.edit_outlined),
-                  title: Text('Edit'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  leading: Icon(Icons.delete_outline),
-                  title: Text('Delete'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ];
-          },
+                if (value == 'delete') {
+                  context.read<AppCubit>().deleteTask(task.id);
+                }
+              },
+              itemBuilder: (context) {
+                return const [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Edit'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline),
+                      title: Text('Delete'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ];
+              },
+            ),
+          ],
         ),
         children: [
           Padding(

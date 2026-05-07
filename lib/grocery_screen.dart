@@ -236,23 +236,13 @@ class GroceryScreen extends StatelessWidget {
                               if (item.autoAddToNext)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 4),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.repeat,
-                                        size: 15,
-                                        color: AppColors.actionBlue,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          loc.repeatsToNextTime,
-                                          style: const TextStyle(
-                                            color: AppColors.actionBlue,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  child: Tooltip(
+                                    message: loc.repeatsToNextTime,
+                                    child: const Icon(
+                                      Icons.repeat,
+                                      size: 15,
+                                      color: AppColors.actionBlue,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -362,6 +352,29 @@ class GroceryScreen extends StatelessWidget {
     );
   }
 
+  Widget _moveAllNextTimeButton({
+    required BuildContext context,
+    required bool hasNextTimeItems,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: hasNextTimeItems
+              ? () {
+                  context
+                      .read<AppCubit>()
+                      .moveAllNextTimeGroceryItemsToCurrent();
+                }
+              : null,
+          icon: const Icon(Icons.keyboard_double_arrow_up),
+          label: const Text('Move all Next Time to Current Run'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AppCubit, AppState>(
@@ -415,6 +428,10 @@ class GroceryScreen extends StatelessWidget {
                           items: currentItems,
                         ),
                       ),
+                      _moveAllNextTimeButton(
+                        context: context,
+                        hasNextTimeItems: nextTimeItems.isNotEmpty,
+                      ),
                       SizedBox(
                         height: 520,
                         child: _sectionPanel(
@@ -447,6 +464,28 @@ class GroceryScreen extends StatelessWidget {
                             emptyText: loc.noGroceriesCurrent,
                             section: GrocerySection.current,
                             items: currentItems,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 190,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: FilledButton.icon(
+                                onPressed: nextTimeItems.isNotEmpty
+                                    ? () {
+                                        context
+                                            .read<AppCubit>()
+                                            .moveAllNextTimeGroceryItemsToCurrent();
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.keyboard_double_arrow_left),
+                                label: const Text(
+                                  'Move All',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         Expanded(
