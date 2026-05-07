@@ -10,6 +10,7 @@ import 'journal_screen.dart';
 import 'todo_screen.dart';
 import 'watchlist_screen.dart';
 import 'grocery_screen.dart';
+import 'app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,17 +41,17 @@ class HybridNoteApp extends StatelessWidget {
       theme: ThemeData(
         fontFamily: 'Segoe UI',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0A66D8),
+          seedColor: AppColors.logoBlue,
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF4F8FF),
+        scaffoldBackgroundColor: AppColors.softBackground,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF0A3D91),
+          foregroundColor: AppColors.darkBlue,
           elevation: 0,
           centerTitle: false,
           titleTextStyle: TextStyle(
-            color: Color(0xFF0A3D91),
+            color: AppColors.darkBlue,
             fontSize: 22,
             fontWeight: FontWeight.w700,
             fontFamily: 'Segoe UI',
@@ -65,7 +66,7 @@ class HybridNoteApp extends StatelessWidget {
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF0A66D8),
+            backgroundColor: AppColors.actionBlue,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
@@ -74,9 +75,9 @@ class HybridNoteApp extends StatelessWidget {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF0A66D8),
+            foregroundColor: AppColors.actionBlue,
             side: const BorderSide(
-              color: Color(0xFF0A66D8),
+              color: AppColors.actionBlue,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
@@ -90,17 +91,17 @@ class HybridNoteApp extends StatelessWidget {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(
-              color: Color(0xFF0A66D8),
+              color: AppColors.actionBlue,
               width: 2,
             ),
           ),
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: Colors.white,
-          indicatorColor: const Color(0xFFD8E9FF),
+          indicatorColor: AppColors.selectedBlue,
           labelTextStyle: WidgetStateProperty.all(
             const TextStyle(
-              color: Color(0xFF0A3D91),
+              color:AppColors.darkBlue,
               fontWeight: FontWeight.w600,
             ),
           ),

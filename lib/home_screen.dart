@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'app_cubit.dart';
 import 'app_state.dart';
+import 'app_colors.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -114,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A3D91),
+                            color: AppColors.darkBlue,
                           ),
                         ),
                         const SizedBox(height: 8),

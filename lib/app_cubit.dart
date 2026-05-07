@@ -145,10 +145,44 @@ class AppCubit extends Cubit<AppState> {
     await storage.saveAppData(data);
   }
 
-  Future<void> _updateAndSave(AppData data) async {
-    final AppData updatedData = data.copyWith(
-      lastModified: DateTime.now().toUtc(),
+
+  SyncTombstone _makeTombstone(String id, DateTime now) {
+    return SyncTombstone(
+      id: id,
+      deletedAt: now.toUtc(),
+      deviceId: state.data.deviceId,
     );
+  }
+
+  List<SyncTombstone> _upsertTombstone(
+    List<SyncTombstone> tombstones,
+    SyncTombstone newTombstone,
+  ) {
+    final List<SyncTombstone> output = tombstones
+        .where((tombstone) => tombstone.id != newTombstone.id)
+        .toList();
+    output.add(newTombstone);
+    output.sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
+    return output;
+  }
+
+  List<SyncTombstone> _removeTombstone(
+    List<SyncTombstone> tombstones,
+    String id,
+  ) {
+    return tombstones.where((tombstone) => tombstone.id != id).toList();
+  }
+
+  String _categoryTombstoneId(String categoryName) {
+    return categoryName.trim().toLowerCase();
+  }
+
+  Future<void> _updateAndSave(AppData data) async {
+    final AppData updatedData = data
+        .copyWith(
+          lastModified: DateTime.now().toUtc(),
+        )
+        .pruneOldTombstones();
 
     _localChangeVersion++;
 
@@ -207,15 +241,13 @@ class AppCubit extends Cubit<AppState> {
       );
 
       if (result.success) {
-        // Important: do NOT replace state.data here. The UI already has the
-        // optimistic local edit. Replacing with the result from an older upload
-        // can make a checkbox flip back if another local edit happened while
-        // the network request was in flight.
         if (uploadVersion == _localChangeVersion) {
-          await _saveData(uploadSnapshot);
+          final AppData syncedData = result.syncedData ?? uploadSnapshot;
+          await _saveData(syncedData);
 
           emit(
             state.copyWith(
+              data: syncedData,
               isGoogleSignedIn: true,
               lastSyncedAt: DateTime.now().toUtc(),
               clearError: true,
@@ -417,7 +449,13 @@ class AppCubit extends Cubit<AppState> {
       });
 
     await _updateAndSave(
-      state.data.copyWith(categories: updatedCategories),
+      state.data.copyWith(
+        categories: updatedCategories,
+        categoryTombstones: _removeTombstone(
+          state.data.categoryTombstones,
+          _categoryTombstoneId(cleanedName),
+        ),
+      ),
     );
   }
 
@@ -444,12 +482,19 @@ class AppCubit extends Cubit<AppState> {
       return;
     }
 
+    final DateTime now = DateTime.now().toUtc();
     final List<String> updatedCategories = state.data.categories
         .where((category) => category != categoryName)
         .toList();
 
     await _updateAndSave(
-      state.data.copyWith(categories: updatedCategories),
+      state.data.copyWith(
+        categories: updatedCategories,
+        categoryTombstones: _upsertTombstone(
+          state.data.categoryTombstones,
+          _makeTombstone(_categoryTombstoneId(categoryName), now),
+        ),
+      ),
     );
   }
 
@@ -608,29 +653,47 @@ class AppCubit extends Cubit<AppState> {
   }
 
   Future<void> deleteTask(String taskId) async {
+    final DateTime now = DateTime.now().toUtc();
     final List<TaskItem> updatedTasks =
         state.data.tasks.where((task) => task.id != taskId).toList();
 
     await _updateAndSave(
-      state.data.copyWith(tasks: updatedTasks),
+      state.data.copyWith(
+        tasks: updatedTasks,
+        taskTombstones: _upsertTombstone(
+          state.data.taskTombstones,
+          _makeTombstone(taskId, now),
+        ),
+      ),
     );
   }
 
   Future<void> clearCompletedTasks(String category) async {
-    final List<TaskItem> updatedTasks = state.data.tasks.where((task) {
-      if (!task.isCompleted) {
-        return true;
+    final DateTime now = DateTime.now().toUtc();
+    List<SyncTombstone> updatedTombstones = state.data.taskTombstones;
+
+    final List<TaskItem> updatedTasks = [];
+
+    for (final TaskItem task in state.data.tasks) {
+      final bool shouldClear = task.isCompleted &&
+          (category == AppData.defaultCategory || task.category == category);
+
+      if (!shouldClear) {
+        updatedTasks.add(task);
+        continue;
       }
 
-      if (category == AppData.defaultCategory) {
-        return false;
-      }
-
-      return task.category != category;
-    }).toList();
+      updatedTombstones = _upsertTombstone(
+        updatedTombstones,
+        _makeTombstone(task.id, now),
+      );
+    }
 
     await _updateAndSave(
-      state.data.copyWith(tasks: updatedTasks),
+      state.data.copyWith(
+        tasks: updatedTasks,
+        taskTombstones: updatedTombstones,
+      ),
     );
   }
 
@@ -760,7 +823,13 @@ class AppCubit extends Cubit<AppState> {
     }).toList();
 
     await _updateAndSave(
-      state.data.copyWith(tasks: updatedTasks),
+      state.data.copyWith(
+        tasks: updatedTasks,
+        subtaskTombstones: _upsertTombstone(
+          state.data.subtaskTombstones,
+          _makeTombstone(subtaskId, now),
+        ),
+      ),
     );
   }
 
@@ -832,11 +901,18 @@ class AppCubit extends Cubit<AppState> {
   }
 
   Future<void> deleteJournalEntry(String entryId) async {
+    final DateTime now = DateTime.now().toUtc();
     final List<JournalEntry> updatedEntries =
         state.data.journalEntries.where((entry) => entry.id != entryId).toList();
 
     await _updateAndSave(
-      state.data.copyWith(journalEntries: updatedEntries),
+      state.data.copyWith(
+        journalEntries: updatedEntries,
+        journalTombstones: _upsertTombstone(
+          state.data.journalTombstones,
+          _makeTombstone(entryId, now),
+        ),
+      ),
     );
   }
 
@@ -923,11 +999,18 @@ class AppCubit extends Cubit<AppState> {
   }
 
   Future<void> deleteWatchItem(String itemId) async {
+    final DateTime now = DateTime.now().toUtc();
     final List<WatchItem> updatedItems =
         state.data.watchItems.where((item) => item.id != itemId).toList();
 
     await _updateAndSave(
-      state.data.copyWith(watchItems: updatedItems),
+      state.data.copyWith(
+        watchItems: updatedItems,
+        watchTombstones: _upsertTombstone(
+          state.data.watchTombstones,
+          _makeTombstone(itemId, now),
+        ),
+      ),
     );
   }
 
@@ -1092,13 +1175,20 @@ class AppCubit extends Cubit<AppState> {
     }
 
     await _updateAndSave(
-      state.data.copyWith(groceryItems: updatedItems),
+      state.data.copyWith(
+        groceryItems: updatedItems,
+        groceryTombstones: _upsertTombstone(
+          state.data.groceryTombstones,
+          _makeTombstone(itemId, now),
+        ),
+      ),
     );
   }
 
   Future<void> clearCompletedGroceryItems(GrocerySection section) async {
     final DateTime now = DateTime.now().toUtc();
     final List<GroceryItem> updatedItems = [];
+    List<SyncTombstone> updatedTombstones = state.data.groceryTombstones;
 
     for (final GroceryItem item in state.data.groceryItems) {
       final bool shouldClear = item.section == section && item.isCompleted;
@@ -1107,6 +1197,11 @@ class AppCubit extends Cubit<AppState> {
         updatedItems.add(item);
         continue;
       }
+
+      updatedTombstones = _upsertTombstone(
+        updatedTombstones,
+        _makeTombstone(item.id, now),
+      );
 
       if (item.section == GrocerySection.current &&
           item.autoAddToNext &&
@@ -1119,7 +1214,10 @@ class AppCubit extends Cubit<AppState> {
     }
 
     await _updateAndSave(
-      state.data.copyWith(groceryItems: updatedItems),
+      state.data.copyWith(
+        groceryItems: updatedItems,
+        groceryTombstones: updatedTombstones,
+      ),
     );
   }
 

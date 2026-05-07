@@ -47,9 +47,6 @@ class DriveSyncService {
     }
   }
 
-  // Manual sync / login sync / pull-to-refresh sync:
-  // last-write-wins by AppData.lastModified. This avoids stale devices
-  // re-adding tasks that were cleared/deleted on another device.
   Future<SyncResult> sync({
     required AppData localData,
   }) async {
@@ -73,8 +70,6 @@ class DriveSyncService {
     }
   }
 
-  // Startup auto-sync:
-  // only runs if a previous Google sign-in can be restored silently.
   Future<SyncResult> autoSyncIfSignedIn({
     required AppData localData,
   }) async {
@@ -108,10 +103,9 @@ class DriveSyncService {
     }
   }
 
-  // Local edit sync:
-  // upload local data as the new source of truth. This is important for deletes.
-  // If you delete/clear/tick locally and we used merge here, the old cloud item
-  // could be merged back. So local edits push the new local JSON to Drive.
+  // Local edit sync still downloads/merges remote first. Tombstones make this
+  // safe for deletes, while preserving independent offline additions from other
+  // devices.
   Future<SyncResult> pushLocalToDrive({
     required AppData localData,
   }) async {
@@ -130,28 +124,9 @@ class DriveSyncService {
         );
       }
 
-      final String? remoteFileId = await _findRemoteFileId(driveApi);
-
-      // Upload the exact app state that AppCubit already timestamped and saved.
-      // Do not create a second modified copy here, because returning a modified
-      // copy from an older network request can overwrite newer checkbox edits.
-      if (remoteFileId == null) {
-        await _createRemoteFile(
-          driveApi: driveApi,
-          data: localData,
-        );
-      } else {
-        await _updateRemoteFile(
-          driveApi: driveApi,
-          fileId: remoteFileId,
-          data: localData,
-        );
-      }
-
-      return SyncResult.success(
-        status: SyncStatus.localNewerUploaded,
-        message: 'Sync complete.',
-        syncedData: localData,
+      return _mergeThenUpload(
+        driveApi: driveApi,
+        localData: localData,
       );
     } catch (error) {
       return SyncResult.failed(
@@ -167,15 +142,22 @@ class DriveSyncService {
     final String? remoteFileId = await _findRemoteFileId(driveApi);
 
     if (remoteFileId == null) {
+      final AppData uploadData = localData
+          .copyWith(
+            schemaVersion: 2,
+            lastModified: DateTime.now().toUtc(),
+          )
+          .pruneOldTombstones();
+
       await _createRemoteFile(
         driveApi: driveApi,
-        data: localData,
+        data: uploadData,
       );
 
       return SyncResult.success(
         status: SyncStatus.noRemoteCreated,
         message: 'Sync complete.',
-        syncedData: localData,
+        syncedData: uploadData,
       );
     }
 
@@ -185,48 +167,41 @@ class DriveSyncService {
     );
 
     if (remoteData == null) {
+      final AppData uploadData = localData
+          .copyWith(
+            schemaVersion: 2,
+            lastModified: DateTime.now().toUtc(),
+          )
+          .pruneOldTombstones();
+
       await _updateRemoteFile(
         driveApi: driveApi,
         fileId: remoteFileId,
-        data: localData,
+        data: uploadData,
       );
 
       return SyncResult.success(
         status: SyncStatus.localNewerUploaded,
         message: 'Sync complete.',
-        syncedData: localData,
+        syncedData: uploadData,
       );
     }
 
-    final DateTime localModified = localData.lastModified.toUtc();
-    final DateTime remoteModified = remoteData.lastModified.toUtc();
+    final AppData mergedData = _mergeAppData(
+      localData: localData,
+      remoteData: remoteData,
+    );
 
-    if (remoteModified.isAfter(localModified)) {
-      return SyncResult.success(
-        status: SyncStatus.remoteNewerDownloaded,
-        message: 'Sync complete.',
-        syncedData: remoteData,
-      );
-    }
-
-    if (localModified.isAfter(remoteModified)) {
-      await _updateRemoteFile(
-        driveApi: driveApi,
-        fileId: remoteFileId,
-        data: localData,
-      );
-
-      return SyncResult.success(
-        status: SyncStatus.localNewerUploaded,
-        message: 'Sync complete.',
-        syncedData: localData,
-      );
-    }
+    await _updateRemoteFile(
+      driveApi: driveApi,
+      fileId: remoteFileId,
+      data: mergedData,
+    );
 
     return SyncResult.success(
-      status: SyncStatus.noChanges,
+      status: SyncStatus.merged,
       message: 'Sync complete.',
-      syncedData: localData,
+      syncedData: mergedData,
     );
   }
 
@@ -350,12 +325,6 @@ class DriveSyncService {
     return encoder.convert(data.toJson());
   }
 
-  AppData _copyWithSyncTime(AppData data) {
-    return data.copyWith(
-      lastModified: DateTime.now().toUtc(),
-    );
-  }
-
   AppData _mergeAppData({
     required AppData localData,
     required AppData remoteData,
@@ -365,300 +334,348 @@ class DriveSyncService {
     final Map<String, dynamic> remoteJson =
         Map<String, dynamic>.from(remoteData.toJson());
 
+    final List<Map<String, dynamic>> taskTombstones = _mergeTombstones(
+      _asListOfMaps(localJson['taskTombstones']),
+      _asListOfMaps(remoteJson['taskTombstones']),
+    );
+    final List<Map<String, dynamic>> subtaskTombstones = _mergeTombstones(
+      _asListOfMaps(localJson['subtaskTombstones']),
+      _asListOfMaps(remoteJson['subtaskTombstones']),
+    );
+    final List<Map<String, dynamic>> journalTombstones = _mergeTombstones(
+      _asListOfMaps(localJson['journalTombstones']),
+      _asListOfMaps(remoteJson['journalTombstones']),
+    );
+    final List<Map<String, dynamic>> watchTombstones = _mergeTombstones(
+      _asListOfMaps(localJson['watchTombstones']),
+      _asListOfMaps(remoteJson['watchTombstones']),
+    );
+    final List<Map<String, dynamic>> groceryTombstones = _mergeTombstones(
+      _asListOfMaps(localJson['groceryTombstones']),
+      _asListOfMaps(remoteJson['groceryTombstones']),
+    );
+    final List<Map<String, dynamic>> categoryTombstones = _mergeTombstones(
+      _asListOfMaps(localJson['categoryTombstones']),
+      _asListOfMaps(remoteJson['categoryTombstones']),
+    );
+
     final Map<String, dynamic> merged = {
-      ...remoteJson,
-      ...localJson,
+      'schemaVersion': 2,
+      'deviceId': localJson['deviceId'] ?? remoteJson['deviceId'] ?? '',
+      'lastModified': DateTime.now().toUtc().toIso8601String(),
+      'categories': _mergeCategories(
+        _asList(localJson['categories']),
+        _asList(remoteJson['categories']),
+        categoryTombstones,
+      ),
+      'tasks': _mergeTasks(
+        _asListOfMaps(localJson['tasks']),
+        _asListOfMaps(remoteJson['tasks']),
+        taskTombstones,
+        subtaskTombstones,
+      ),
+      'journalEntries': _removeExactDuplicates(
+        _mergeItemsById(
+          _asListOfMaps(localJson['journalEntries']),
+          _asListOfMaps(remoteJson['journalEntries']),
+          journalTombstones,
+        ),
+        _journalExactKey,
+      ),
+      'watchItems': _removeExactDuplicates(
+        _mergeItemsById(
+          _asListOfMaps(localJson['watchItems']),
+          _asListOfMaps(remoteJson['watchItems']),
+          watchTombstones,
+        ),
+        _watchExactKey,
+      ),
+      'groceryItems': _removeExactDuplicates(
+        _mergeItemsById(
+          _asListOfMaps(localJson['groceryItems']),
+          _asListOfMaps(remoteJson['groceryItems']),
+          groceryTombstones,
+        ),
+        _groceryExactKey,
+      ),
+      'taskTombstones': taskTombstones,
+      'subtaskTombstones': subtaskTombstones,
+      'journalTombstones': journalTombstones,
+      'watchTombstones': watchTombstones,
+      'groceryTombstones': groceryTombstones,
+      'categoryTombstones': categoryTombstones,
     };
 
-    merged['schemaVersion'] = _maxInt(
-      localJson['schemaVersion'],
-      remoteJson['schemaVersion'],
-    );
-    merged['deviceId'] = localJson['deviceId'] ?? remoteJson['deviceId'];
-    merged['lastModified'] = DateTime.now().toUtc().toIso8601String();
-
-    merged['categories'] = _mergeStringList(
-      _asList(localJson['categories']),
-      _asList(remoteJson['categories']),
-      removeLegacyMyTasks: true,
-    );
-
-    merged['tasks'] = _mergeTasksByTitle(
-      _asListOfMaps(localJson['tasks']),
-      _asListOfMaps(remoteJson['tasks']),
-    );
-
-    merged['journalEntries'] = _mergeExactDuplicateOnly(
-      _asListOfMaps(localJson['journalEntries']),
-      _asListOfMaps(remoteJson['journalEntries']),
-      keyBuilder: _journalExactKey,
-    );
-
-    merged['watchItems'] = _mergeExactDuplicateOnly(
-      _asListOfMaps(localJson['watchItems']),
-      _asListOfMaps(remoteJson['watchItems']),
-      keyBuilder: _watchExactKey,
-    );
-
-    merged['groceryItems'] = _mergeExactDuplicateOnly(
-      _asListOfMaps(localJson['groceryItems']),
-      _asListOfMaps(remoteJson['groceryItems']),
-      keyBuilder: _genericExactKey,
-    );
-
-    return AppData.fromJson(merged);
+    return AppData.fromJson(merged)
+        .copyWith(lastModified: DateTime.now().toUtc())
+        .pruneOldTombstones();
   }
 
-  List<Map<String, dynamic>> _mergeTasksByTitle(
-    List<Map<String, dynamic>> localTasks,
-    List<Map<String, dynamic>> remoteTasks,
+  List<String> _mergeCategories(
+    List<dynamic> localCategories,
+    List<dynamic> remoteCategories,
+    List<Map<String, dynamic>> categoryTombstones,
   ) {
-    final Map<String, Map<String, dynamic>> merged = {};
+    final Set<String> deleted = categoryTombstones
+        .map((item) => _normalizedString(item['id']))
+        .where((item) => item.isNotEmpty)
+        .toSet();
 
-    for (final Map<String, dynamic> task in remoteTasks) {
-      final String key = _taskTitleKey(task);
-      merged[key.isEmpty ? _fallbackItemKey(task) : key] =
-          Map<String, dynamic>.from(task);
-    }
-
-    for (final Map<String, dynamic> localTask in localTasks) {
-      final String key = _taskTitleKey(localTask);
-      final String safeKey = key.isEmpty ? _fallbackItemKey(localTask) : key;
-      final Map<String, dynamic>? remoteTask = merged[safeKey];
-
-      if (remoteTask == null) {
-        merged[safeKey] = Map<String, dynamic>.from(localTask);
-        continue;
-      }
-
-      merged[safeKey] = _mergeOneTaskByTitle(
-        localTask: localTask,
-        remoteTask: remoteTask,
-      );
-    }
-
-    final List<Map<String, dynamic>> output = merged.values.toList();
-    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
-    return output;
-  }
-
-  Map<String, dynamic> _mergeOneTaskByTitle({
-    required Map<String, dynamic> localTask,
-    required Map<String, dynamic> remoteTask,
-  }) {
-    final bool localNewer = _itemUpdatedAt(localTask).isAfter(
-      _itemUpdatedAt(remoteTask),
-    );
-
-    final Map<String, dynamic> base = Map<String, dynamic>.from(
-      localNewer ? localTask : remoteTask,
-    );
-    final Map<String, dynamic> older = localNewer ? remoteTask : localTask;
-
-    base['subtasks'] = _mergeSubtasksByTitle(
-      _asListOfMaps(localTask['subtasks']),
-      _asListOfMaps(remoteTask['subtasks']),
-    );
-
-    base['isCompleted'] =
-        _boolValue(localTask['isCompleted']) || _boolValue(remoteTask['isCompleted']);
-
-    base['category'] = _preferNonEmpty(
-      base['category'],
-      older['category'],
-    );
-
-    base['description'] = _preferNonEmpty(
-      base['description'],
-      older['description'],
-    );
-
-    base['reminderAt'] = _preferNewerField(
-      localItem: localTask,
-      remoteItem: remoteTask,
-      field: 'reminderAt',
-    );
-    base['repeatFrequency'] = _preferNewerField(
-      localItem: localTask,
-      remoteItem: remoteTask,
-      field: 'repeatFrequency',
-    );
-    base['customRepeatDays'] = _preferNewerField(
-      localItem: localTask,
-      remoteItem: remoteTask,
-      field: 'customRepeatDays',
-    );
-
-    base['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-
-    return base;
-  }
-
-  List<Map<String, dynamic>> _mergeSubtasksByTitle(
-    List<Map<String, dynamic>> localSubtasks,
-    List<Map<String, dynamic>> remoteSubtasks,
-  ) {
-    final Map<String, Map<String, dynamic>> merged = {};
-
-    for (final Map<String, dynamic> subtask in remoteSubtasks) {
-      final String key = _normalizedString(subtask['title']);
-      merged[key.isEmpty ? _fallbackItemKey(subtask) : key] =
-          Map<String, dynamic>.from(subtask);
-    }
-
-    for (final Map<String, dynamic> localSubtask in localSubtasks) {
-      final String key = _normalizedString(localSubtask['title']);
-      final String safeKey = key.isEmpty ? _fallbackItemKey(localSubtask) : key;
-      final Map<String, dynamic>? remoteSubtask = merged[safeKey];
-
-      if (remoteSubtask == null) {
-        merged[safeKey] = Map<String, dynamic>.from(localSubtask);
-        continue;
-      }
-
-      final bool localNewer = _itemUpdatedAt(localSubtask).isAfter(
-        _itemUpdatedAt(remoteSubtask),
-      );
-
-      final Map<String, dynamic> base = Map<String, dynamic>.from(
-        localNewer ? localSubtask : remoteSubtask,
-      );
-
-      base['isCompleted'] = _boolValue(localSubtask['isCompleted']) ||
-          _boolValue(remoteSubtask['isCompleted']);
-      base['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-      merged[safeKey] = base;
-    }
-
-    final List<Map<String, dynamic>> output = merged.values.toList();
-    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
-    return output;
-  }
-
-  List<Map<String, dynamic>> _mergeExactDuplicateOnly(
-    List<Map<String, dynamic>> localItems,
-    List<Map<String, dynamic>> remoteItems, {
-    required String Function(Map<String, dynamic> item) keyBuilder,
-  }) {
-    final Map<String, Map<String, dynamic>> merged = {};
-
-    for (final Map<String, dynamic> item in remoteItems) {
-      merged[keyBuilder(item)] = Map<String, dynamic>.from(item);
-    }
-
-    for (final Map<String, dynamic> item in localItems) {
-      final String key = keyBuilder(item);
-      final Map<String, dynamic>? existing = merged[key];
-
-      if (existing == null) {
-        merged[key] = Map<String, dynamic>.from(item);
-        continue;
-      }
-
-      final bool localNewer = _itemUpdatedAt(item).isAfter(
-        _itemUpdatedAt(existing),
-      );
-
-      merged[key] = Map<String, dynamic>.from(localNewer ? item : existing);
-    }
-
-    final List<Map<String, dynamic>> output = merged.values.toList();
-    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
-    return output;
-  }
-
-  List<String> _mergeStringList(
-    List<dynamic> localList,
-    List<dynamic> remoteList, {
-    required bool removeLegacyMyTasks,
-  }) {
     final Set<String> seen = {};
     final List<String> output = [];
 
-    void addValue(dynamic value) {
-      final String text = value.toString().trim();
-      if (text.isEmpty) {
+    void add(dynamic value) {
+      final String category = value.toString().trim();
+      if (category.isEmpty || category == 'My Tasks') {
         return;
       }
-      if (removeLegacyMyTasks && text == 'My Tasks') {
+
+      if (category == AppData.defaultCategory) {
         return;
       }
-      final String key = text.toLowerCase();
+
+      final String key = category.toLowerCase();
+      if (deleted.contains(key)) {
+        return;
+      }
+
       if (seen.add(key)) {
-        output.add(text);
+        output.add(category);
       }
     }
 
-    addValue(AppData.defaultCategory);
-
-    for (final dynamic value in localList) {
-      addValue(value);
+    for (final dynamic value in remoteCategories) {
+      add(value);
     }
 
-    for (final dynamic value in remoteList) {
-      addValue(value);
+    for (final dynamic value in localCategories) {
+      add(value);
     }
 
-    output.sort((a, b) {
-      if (a == AppData.defaultCategory) {
-        return -1;
-      }
-      if (b == AppData.defaultCategory) {
-        return 1;
-      }
-      return a.toLowerCase().compareTo(b.toLowerCase());
-    });
+    output.sort();
+    return [AppData.defaultCategory, ...output];
+  }
 
+  List<Map<String, dynamic>> _mergeTasks(
+    List<Map<String, dynamic>> localTasks,
+    List<Map<String, dynamic>> remoteTasks,
+    List<Map<String, dynamic>> taskTombstones,
+    List<Map<String, dynamic>> subtaskTombstones,
+  ) {
+    final Map<String, Map<String, dynamic>> localById = _itemsById(localTasks);
+    final Map<String, Map<String, dynamic>> remoteById = _itemsById(remoteTasks);
+    final Set<String> ids = {...localById.keys, ...remoteById.keys};
+    final List<Map<String, dynamic>> output = [];
+
+    for (final String id in ids) {
+      final Map<String, dynamic>? localItem = localById[id];
+      final Map<String, dynamic>? remoteItem = remoteById[id];
+      final Map<String, dynamic>? tombstone = _latestTombstoneForId(
+        id,
+        taskTombstones,
+      );
+      final Map<String, dynamic>? newestItem = _newestItem(localItem, remoteItem);
+
+      if (newestItem == null) {
+        continue;
+      }
+
+      if (tombstone != null &&
+          !_itemUpdatedAt(newestItem).isAfter(_tombstoneDeletedAt(tombstone))) {
+        continue;
+      }
+
+      final Map<String, dynamic> mergedTask = Map<String, dynamic>.from(newestItem);
+      mergedTask['subtasks'] = _mergeItemsById(
+        _asListOfMaps(localItem?['subtasks']),
+        _asListOfMaps(remoteItem?['subtasks']),
+        subtaskTombstones,
+      );
+      output.add(mergedTask);
+    }
+
+    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
     return output;
   }
 
-  String _mergeMessage({
-    required AppData localData,
-    required AppData remoteData,
-    required AppData mergedData,
-  }) {
-    return 'Sync complete.';
+  List<Map<String, dynamic>> _mergeItemsById(
+    List<Map<String, dynamic>> localItems,
+    List<Map<String, dynamic>> remoteItems,
+    List<Map<String, dynamic>> tombstones,
+  ) {
+    final Map<String, Map<String, dynamic>> localById = _itemsById(localItems);
+    final Map<String, Map<String, dynamic>> remoteById = _itemsById(remoteItems);
+    final Set<String> ids = {...localById.keys, ...remoteById.keys};
+    final List<Map<String, dynamic>> output = [];
+
+    for (final String id in ids) {
+      final Map<String, dynamic>? newestItem = _newestItem(
+        localById[id],
+        remoteById[id],
+      );
+      final Map<String, dynamic>? tombstone = _latestTombstoneForId(
+        id,
+        tombstones,
+      );
+
+      if (newestItem == null) {
+        continue;
+      }
+
+      if (tombstone != null &&
+          !_itemUpdatedAt(newestItem).isAfter(_tombstoneDeletedAt(tombstone))) {
+        continue;
+      }
+
+      output.add(Map<String, dynamic>.from(newestItem));
+    }
+
+    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
+    return output;
   }
 
-  int _totalItemCount(AppData data) {
-    final Map<String, dynamic> json = data.toJson();
-    return _asList(json['tasks']).length +
-        _asList(json['journalEntries']).length +
-        _asList(json['watchItems']).length +
-        _asList(json['groceryItems']).length;
+  List<Map<String, dynamic>> _mergeTombstones(
+    List<Map<String, dynamic>> localTombstones,
+    List<Map<String, dynamic>> remoteTombstones,
+  ) {
+    final DateTime cutoff = DateTime.now().toUtc().subtract(
+          const Duration(days: 365),
+        );
+    final Map<String, Map<String, dynamic>> byId = {};
+
+    void add(Map<String, dynamic> tombstone) {
+      final String id = tombstone['id']?.toString().trim() ?? '';
+      if (id.isEmpty) {
+        return;
+      }
+
+      if (!_tombstoneDeletedAt(tombstone).isAfter(cutoff)) {
+        return;
+      }
+
+      final Map<String, dynamic>? existing = byId[id];
+      if (existing == null ||
+          _tombstoneDeletedAt(tombstone).isAfter(_tombstoneDeletedAt(existing))) {
+        byId[id] = Map<String, dynamic>.from(tombstone);
+      }
+    }
+
+    for (final Map<String, dynamic> tombstone in remoteTombstones) {
+      add(tombstone);
+    }
+
+    for (final Map<String, dynamic> tombstone in localTombstones) {
+      add(tombstone);
+    }
+
+    final List<Map<String, dynamic>> output = byId.values.toList();
+    output.sort((a, b) => _tombstoneDeletedAt(b).compareTo(_tombstoneDeletedAt(a)));
+    return output;
   }
 
-  String _taskTitleKey(Map<String, dynamic> item) {
-    return 'task:${_normalizedString(item['title'])}';
+  List<Map<String, dynamic>> _removeExactDuplicates(
+    List<Map<String, dynamic>> items,
+    String Function(Map<String, dynamic> item) keyBuilder,
+  ) {
+    final Map<String, Map<String, dynamic>> byKey = {};
+
+    for (final Map<String, dynamic> item in items) {
+      final String key = keyBuilder(item);
+      final Map<String, dynamic>? existing = byKey[key];
+
+      if (existing == null || _itemUpdatedAt(item).isAfter(_itemUpdatedAt(existing))) {
+        byKey[key] = item;
+      }
+    }
+
+    final List<Map<String, dynamic>> output = byKey.values.toList();
+    output.sort(_compareByUpdatedAtOrCreatedAtDescending);
+    return output;
+  }
+
+  Map<String, Map<String, dynamic>> _itemsById(List<Map<String, dynamic>> items) {
+    final Map<String, Map<String, dynamic>> byId = {};
+
+    for (final Map<String, dynamic> item in items) {
+      final String id = item['id']?.toString().trim() ?? '';
+      if (id.isEmpty) {
+        continue;
+      }
+
+      final Map<String, dynamic>? existing = byId[id];
+      if (existing == null || _itemUpdatedAt(item).isAfter(_itemUpdatedAt(existing))) {
+        byId[id] = Map<String, dynamic>.from(item);
+      }
+    }
+
+    return byId;
+  }
+
+  Map<String, dynamic>? _newestItem(
+    Map<String, dynamic>? localItem,
+    Map<String, dynamic>? remoteItem,
+  ) {
+    if (localItem == null) {
+      return remoteItem == null ? null : Map<String, dynamic>.from(remoteItem);
+    }
+
+    if (remoteItem == null) {
+      return Map<String, dynamic>.from(localItem);
+    }
+
+    if (_itemUpdatedAt(localItem).isAfter(_itemUpdatedAt(remoteItem))) {
+      return Map<String, dynamic>.from(localItem);
+    }
+
+    return Map<String, dynamic>.from(remoteItem);
+  }
+
+  Map<String, dynamic>? _latestTombstoneForId(
+    String id,
+    List<Map<String, dynamic>> tombstones,
+  ) {
+    Map<String, dynamic>? newest;
+
+    for (final Map<String, dynamic> tombstone in tombstones) {
+      if (tombstone['id']?.toString() != id) {
+        continue;
+      }
+
+      if (newest == null ||
+          _tombstoneDeletedAt(tombstone).isAfter(_tombstoneDeletedAt(newest))) {
+        newest = tombstone;
+      }
+    }
+
+    return newest;
   }
 
   String _journalExactKey(Map<String, dynamic> item) {
-    final String title = _normalizedString(item['title']);
-    final String body = _normalizedString(item['body'] ?? item['content']);
-    final String date = _normalizedString(
-      item['date'] ?? item['entryDate'] ?? item['createdAt'],
-    );
-
-    return 'journal:$title|$body|$date';
+    return [
+      _normalizedString(item['title']),
+      _normalizedString(item['body']),
+      _normalizedString(item['createdAt']),
+    ].join('|');
   }
 
   String _watchExactKey(Map<String, dynamic> item) {
-    final List<String> parts = item.keys.toList()..sort();
-    return 'watch:${parts.map((key) => '$key=${item[key]}').join('|')}';
+    return [
+      _normalizedString(item['title']),
+      _normalizedString(item['type']),
+      _normalizedString(item['status']),
+      _normalizedString(item['season']),
+      _normalizedString(item['episode']),
+      _normalizedString(item['notes']),
+    ].join('|');
   }
 
-  String _genericExactKey(Map<String, dynamic> item) {
-    final List<String> parts = item.keys.toList()..sort();
-    return 'generic:${parts.map((key) => '$key=${item[key]}').join('|')}';
-  }
-
-  String _fallbackItemKey(Map<String, dynamic> item) {
-    final String id = item['id']?.toString() ?? '';
-    if (id.isNotEmpty) {
-      return 'id:$id';
-    }
-
-    return _genericExactKey(item);
+  String _groceryExactKey(Map<String, dynamic> item) {
+    return [
+      _normalizedString(item['title']),
+      _normalizedString(item['description']),
+      _normalizedString(item['section']),
+      _normalizedString(item['autoAddToNext']),
+    ].join('|');
   }
 
   int _compareByUpdatedAtOrCreatedAtDescending(
@@ -674,42 +691,9 @@ class DriveSyncService {
         DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 
-  dynamic _preferNewerField({
-    required Map<String, dynamic> localItem,
-    required Map<String, dynamic> remoteItem,
-    required String field,
-  }) {
-    final bool localNewer = _itemUpdatedAt(localItem).isAfter(
-      _itemUpdatedAt(remoteItem),
-    );
-
-    final dynamic preferred = localNewer ? localItem[field] : remoteItem[field];
-    final dynamic fallback = localNewer ? remoteItem[field] : localItem[field];
-
-    return preferred ?? fallback;
-  }
-
-  dynamic _preferNonEmpty(dynamic preferred, dynamic fallback) {
-    final String preferredText = preferred?.toString().trim() ?? '';
-    if (preferredText.isNotEmpty) {
-      return preferred;
-    }
-
-    return fallback;
-  }
-
-  bool _boolValue(dynamic value) {
-    if (value is bool) {
-      return value;
-    }
-
-    return value.toString().toLowerCase() == 'true';
-  }
-
-  int _maxInt(dynamic a, dynamic b) {
-    final int first = int.tryParse(a?.toString() ?? '') ?? 0;
-    final int second = int.tryParse(b?.toString() ?? '') ?? 0;
-    return first > second ? first : second;
+  DateTime _tombstoneDeletedAt(Map<String, dynamic> tombstone) {
+    return _parseDateTime(tombstone['deletedAt']) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 
   List<dynamic> _asList(dynamic value) {

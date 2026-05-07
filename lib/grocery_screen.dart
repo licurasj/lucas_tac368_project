@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'app_cubit.dart';
 import 'app_state.dart';
 import 'grocery_item.dart';
+import 'app_colors.dart';
 
 class GroceryScreen extends StatelessWidget {
   const GroceryScreen({super.key});
@@ -166,7 +167,7 @@ class GroceryScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A3D91),
+                      color: AppColors.darkBlue,
                     ),
                   ),
                 ),
@@ -174,7 +175,7 @@ class GroceryScreen extends StatelessWidget {
                 Text(
                   '${items.length}',
                   style: const TextStyle(
-                    color: Color(0xFF0A66D8),
+                    color: AppColors.actionBlue,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -206,11 +207,11 @@ class GroceryScreen extends StatelessWidget {
 
                       return Card(
                         elevation: 0,
-                        color: const Color(0xFFF8FBFF),
+                        color: AppColors.softCardBlue,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                           side: const BorderSide(
-                            color: Color(0xFFD8E9FF),
+                            color: AppColors.borderBlue,
                           ),
                         ),
                         child: ListTile(
@@ -244,14 +245,14 @@ class GroceryScreen extends StatelessWidget {
                                       Icon(
                                         Icons.repeat,
                                         size: 15,
-                                        color: Color(0xFF0A66D8),
+                                        color: AppColors.actionBlue,
                                       ),
                                       SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
                                           'Repeats to Next Time after clearing',
                                           style: TextStyle(
-                                            color: Color(0xFF0A66D8),
+                                            color: AppColors.actionBlue,
                                           ),
                                         ),
                                       ),
@@ -315,7 +316,7 @@ class GroceryScreen extends StatelessWidget {
                 Text(
                   '$tickedCount ticked',
                   style: const TextStyle(
-                    color: Colors.blueGrey,
+                    color: AppColors.mutedText,
                   ),
                 ),
                 const Spacer(),
@@ -365,60 +366,77 @@ class GroceryScreen extends StatelessWidget {
           });
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F8FF),
+          backgroundColor: AppColors.softBackground,
           appBar: AppBar(
             title: const Text('Grocery List'),
           ),
           body: LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth < 850) {
-                return ListView(
-                  children: [
-                    SizedBox(
-                      height: 520,
-                      child: _sectionPanel(
-                        context: context,
-                        title: 'Current Grocery Run',
-                        emptyText: 'No groceries for this run yet.',
-                        section: GrocerySection.current,
-                        items: currentItems,
+                return RefreshIndicator(
+                  onRefresh: () {
+                    return context.read<AppCubit>().syncWithDrive();
+                  },
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: 520,
+                        child: _sectionPanel(
+                          context: context,
+                          title: 'Current Grocery Run',
+                          emptyText: 'No groceries for this run yet.',
+                          section: GrocerySection.current,
+                          items: currentItems,
+                        ),
                       ),
-                    ),
-                    SizedBox(
-                      height: 520,
-                      child: _sectionPanel(
-                        context: context,
-                        title: 'Next Time',
-                        emptyText: 'No saved groceries for next time yet.',
-                        section: GrocerySection.nextTime,
-                        items: nextTimeItems,
+                      SizedBox(
+                        height: 520,
+                        child: _sectionPanel(
+                          context: context,
+                          title: 'Next Time',
+                          emptyText: 'No saved groceries for next time yet.',
+                          section: GrocerySection.nextTime,
+                          items: nextTimeItems,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               }
 
-              return Row(
-                children: [
-                  Expanded(
-                    child: _sectionPanel(
-                      context: context,
-                      title: 'Current Grocery Run',
-                      emptyText: 'No groceries for this run yet.',
-                      section: GrocerySection.current,
-                      items: currentItems,
+              return RefreshIndicator(
+                onRefresh: () {
+                  return context.read<AppCubit>().syncWithDrive();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _sectionPanel(
+                            context: context,
+                            title: 'Current Grocery Run',
+                            emptyText: 'No groceries for this run yet.',
+                            section: GrocerySection.current,
+                            items: currentItems,
+                          ),
+                        ),
+                        Expanded(
+                          child: _sectionPanel(
+                            context: context,
+                            title: 'Next Time',
+                            emptyText: 'No saved groceries for next time yet.',
+                            section: GrocerySection.nextTime,
+                            items: nextTimeItems,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: _sectionPanel(
-                      context: context,
-                      title: 'Next Time',
-                      emptyText: 'No saved groceries for next time yet.',
-                      section: GrocerySection.nextTime,
-                      items: nextTimeItems,
-                    ),
-                  ),
-                ],
+                ),
               );
             },
           ),

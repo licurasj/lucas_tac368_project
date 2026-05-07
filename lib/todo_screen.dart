@@ -6,6 +6,7 @@ import 'app_data.dart';
 import 'app_cubit.dart';
 import 'app_state.dart';
 import 'task_item.dart';
+import 'app_colors.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -61,7 +62,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0A3D91),
+                        color: AppColors.darkBlue
                       ),
                     ),
                   ),
@@ -70,7 +71,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       _showAddCategoryDialog(context);
                     },
                     icon: const Icon(Icons.add),
-                    color: const Color(0xFF0A66D8),
+                    color: AppColors.actionBlue,
                     tooltip: 'Create category',
                   ),
                   if (isDrawer)
@@ -101,14 +102,14 @@ class _TodoScreenState extends State<TodoScreen> {
 
                   return ListTile(
                     selected: isSelected,
-                    selectedTileColor: const Color(0xFFD8E9FF),
+                    selectedTileColor: AppColors.borderBlue,
                     leading: Icon(
                       category == AppData.defaultCategory
                           ? Icons.task_alt
                           : Icons.folder_outlined,
                       color: isSelected
-                          ? const Color(0xFF0A66D8)
-                          : Colors.blueGrey,
+                          ? AppColors.actionBlue
+                          : AppColors.mutedIcon,
                     ),
                     title: Text(
                       _categoryDisplayName(category),
@@ -186,7 +187,7 @@ class _TodoScreenState extends State<TodoScreen> {
               style: TextStyle(
                 fontSize: isNarrow ? 22 : 26,
                 fontWeight: FontWeight.bold,
-                color: const Color(0xFF0A3D91),
+                color: AppColors.darkBlue,
               ),
             ),
           ),
@@ -474,7 +475,7 @@ class _TodoScreenState extends State<TodoScreen> {
                             child: Text(
                               'Reminder: ${DateFormat.yMMMd().add_jm().format(combinedReminder)}',
                               style: const TextStyle(
-                                color: Color(0xFF0A66D8),
+                                color: AppColors.actionBlue,
                               ),
                             ),
                           ),
@@ -720,7 +721,7 @@ class _TodoScreenState extends State<TodoScreen> {
                     const Icon(
                       Icons.notifications_outlined,
                       size: 16,
-                      color: Color(0xFF0A66D8),
+                      color: AppColors.actionBlue,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
@@ -729,7 +730,7 @@ class _TodoScreenState extends State<TodoScreen> {
                         overflow: TextOverflow.ellipsis,
                         maxLines: 2,
                         style: const TextStyle(
-                          color: Color(0xFF0A66D8),
+                          color: AppColors.actionBlue,
                         ),
                       ),
                     ),
@@ -794,7 +795,7 @@ class _TodoScreenState extends State<TodoScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A3D91),
+                          color: AppColors.darkBlue,
                         ),
                       ),
                     ),
@@ -889,7 +890,7 @@ class _TodoScreenState extends State<TodoScreen> {
           style: const TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0A3D91),
+            color: AppColors.darkBlue,
           ),
         ),
       ),
@@ -1006,7 +1007,7 @@ class _TodoScreenState extends State<TodoScreen> {
                           '$completedTaskCount ticked',
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.blueGrey,
+                            color: AppColors.mutedText,
                           ),
                         ),
                       ),
@@ -1031,7 +1032,7 @@ class _TodoScreenState extends State<TodoScreen> {
             );
 
             return Scaffold(
-              backgroundColor: const Color(0xFFF4F8FF),
+              backgroundColor: AppColors.softBackground,
               appBar: AppBar(
                 title: const Text('Tasks'),
                 actions: [

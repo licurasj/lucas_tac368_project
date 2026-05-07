@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'app_cubit.dart';
 import 'app_state.dart';
 import 'journal_entry.dart';
+import 'app_colors.dart';
 
 class JournalScreen extends StatefulWidget {
   const JournalScreen({super.key});
@@ -56,7 +57,7 @@ class _JournalScreenState extends State<JournalScreen> {
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A3D91),
+                            color: AppColors.darkBlue,
                           ),
                         ),
                       ),
@@ -164,7 +165,7 @@ class _JournalScreenState extends State<JournalScreen> {
                           style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A3D91),
+                            color: AppColors.darkBlue,
                           ),
                         ),
                       ),
@@ -180,7 +181,7 @@ class _JournalScreenState extends State<JournalScreen> {
                   Text(
                     dateText,
                     style: const TextStyle(
-                      color: Colors.blueGrey,
+                      color: AppColors.mutedText,
                       fontSize: 14,
                     ),
                   ),
@@ -246,7 +247,7 @@ class _JournalScreenState extends State<JournalScreen> {
       title: Text(entry.title),
       subtitle: Text(
         dateText,
-        style: const TextStyle(color: Colors.blueGrey),
+        style: const TextStyle(color: AppColors.mutedText),
       ),
       onTap: () {
         _showReadJournalDialog(context, entry);
@@ -301,7 +302,7 @@ class _JournalScreenState extends State<JournalScreen> {
           ..sort((a, b) => b.compareTo(a));
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F8FF),
+          backgroundColor: AppColors.softBackground,
           appBar: AppBar(
             title: const Text('Journal'),
           ),
@@ -311,89 +312,96 @@ class _JournalScreenState extends State<JournalScreen> {
             },
             child: const Icon(Icons.add),
           ),
-          body: entries.isEmpty
-              ? const Center(
-                  child: Text('No journal entries yet.'),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: years.length,
-                  itemBuilder: (context, yearIndex) {
-                    final int year = years[yearIndex];
-                    final Map<int, List<JournalEntry>> monthsMap =
-                        grouped[year]!;
-                    final List<int> months = monthsMap.keys.toList()
-                      ..sort((a, b) => b.compareTo(a));
-
-                    final bool showMonths = months.length > 1;
-
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+          body: RefreshIndicator(
+            onRefresh: () {
+              return context.read<AppCubit>().syncWithDrive();
+            },
+            child: entries.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
+                    children: const [
+                      SizedBox(height: 260),
+                      Center(
+                        child: Text('No journal entries yet.'),
                       ),
-                      child: ExpansionTile(
-                        key: PageStorageKey('year_$year'),
-                        initiallyExpanded: _expandedYears.contains(year),
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            if (expanded) {
-                              _expandedYears.add(year);
-                            } else {
-                              _expandedYears.remove(year);
-                            }
-                          });
-                        },
-                        title: Text(
-                          '$year',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A3D91),
-                          ),
+                    ],
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
+                    itemCount: years.length,
+                    itemBuilder: (context, yearIndex) {
+                      final int year = years[yearIndex];
+                      final Map<int, List<JournalEntry>> monthsMap =
+                          grouped[year]!;
+                      final List<int> months = monthsMap.keys.toList()
+                        ..sort((a, b) => b.compareTo(a));
+
+                      final bool showMonths = months.length > 1;
+
+                      return Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        children: showMonths
-                            ? months.map((month) {
-                                final String monthKey = '$year-$month';
-                                final List<JournalEntry> monthEntries =
-                                    monthsMap[month]!
-                                      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                        child: ExpansionTile(
+                          key: PageStorageKey('year_$year'),
+                          initiallyExpanded: _expandedYears.contains(year),
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              if (expanded) {
+                                _expandedYears.add(year);
+                              } else {
+                                _expandedYears.remove(year);
+                              }
+                            });
+                          },
+                          title: Text('$year'),
+                          children: showMonths
+                              ? months.map((month) {
+                                  final String monthKey = '$year-$month';
+                                  final List<JournalEntry> monthEntries =
+                                      monthsMap[month]!;
 
-                                return ExpansionTile(
-                                  key: PageStorageKey('month_$monthKey'),
-                                  initiallyExpanded:
-                                      _expandedMonths.contains(monthKey),
-                                  onExpansionChanged: (expanded) {
-                                    setState(() {
-                                      if (expanded) {
-                                        _expandedMonths.add(monthKey);
-                                      } else {
-                                        _expandedMonths.remove(monthKey);
-                                      }
-                                    });
-                                  },
-                                  title: Text(
-                                    _monthLabel(month),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
+                                  return ExpansionTile(
+                                    key: PageStorageKey(monthKey),
+                                    initiallyExpanded:
+                                        _expandedMonths.contains(monthKey),
+                                    onExpansionChanged: (expanded) {
+                                      setState(() {
+                                        if (expanded) {
+                                          _expandedMonths.add(monthKey);
+                                        } else {
+                                          _expandedMonths.remove(monthKey);
+                                        }
+                                      });
+                                    },
+                                    title: Text(_monthLabel(month)),
+                                    children: monthEntries
+                                        .map(
+                                          (entry) => _buildEntryTile(
+                                            context,
+                                            entry,
+                                          ),
+                                        )
+                                        .toList(),
+                                  );
+                                }).toList()
+                              : months
+                                  .expand(
+                                    (month) => monthsMap[month]!.map(
+                                      (entry) => _buildEntryTile(
+                                        context,
+                                        entry,
+                                      ),
                                     ),
-                                  ),
-                                  children: monthEntries
-                                      .map(
-                                        (entry) =>
-                                            _buildEntryTile(context, entry),
-                                      )
-                                      .toList(),
-                                );
-                              }).toList()
-                            : monthsMap[months.first]!
-                                .map(
-                                  (entry) => _buildEntryTile(context, entry),
-                                )
-                                .toList(),
-                      ),
-                    );
-                  },
-                ),
+                                  )
+                                  .toList(),
+                        ),
+                      );
+                    },
+                  ),
+          ),
         );
       },
     );

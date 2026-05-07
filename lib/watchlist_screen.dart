@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'app_cubit.dart';
 import 'app_state.dart';
 import 'watch_item.dart';
+import 'app_colors.dart';
 
 class WatchlistScreen extends StatelessWidget {
   const WatchlistScreen({super.key});
@@ -240,7 +241,7 @@ class WatchlistScreen extends StatelessWidget {
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F8FF),
+          backgroundColor: AppColors.softBackground,
           appBar: AppBar(
             title: const Text('Watch/Read List'),
           ),
@@ -250,71 +251,84 @@ class WatchlistScreen extends StatelessWidget {
             },
             child: const Icon(Icons.add),
           ),
-          body: items.isEmpty
-              ? const Center(
-                  child: Text('No watch/read items yet.'),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final WatchItem item = items[index];
-
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+          body: RefreshIndicator(
+            onRefresh: () {
+              return context.read<AppCubit>().syncWithDrive();
+            },
+            child: items.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
+                    children: const [
+                      SizedBox(height: 260),
+                      Center(
+                        child: Text('No watch/read items yet.'),
                       ),
-                      child: ListTile(
-                        title: Text(
-                          item.title,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                        ),
-                        subtitle: Text(
-                          _watchSubtitle(item),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 3,
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              _showWatchItemDialog(
-                                context,
-                                item: item,
-                              );
-                            }
+                    ],
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final WatchItem item = items[index];
 
-                            if (value == 'delete') {
-                              context.read<AppCubit>().deleteWatchItem(
-                                    item.id,
-                                  );
-                            }
-                          },
-                          itemBuilder: (context) {
-                            return const [
-                              PopupMenuItem(
-                                value: 'edit',
-                                child: ListTile(
-                                  leading: Icon(Icons.edit_outlined),
-                                  title: Text('Edit'),
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: ListTile(
-                                  leading: Icon(Icons.delete_outline),
-                                  title: Text('Delete'),
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ];
-                          },
+                      return Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                        child: ListTile(
+                          title: Text(
+                            item.title,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                          subtitle: Text(
+                            _watchSubtitle(item),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 3,
+                          ),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _showWatchItemDialog(
+                                  context,
+                                  item: item,
+                                );
+                              }
+
+                              if (value == 'delete') {
+                                context.read<AppCubit>().deleteWatchItem(
+                                      item.id,
+                                    );
+                              }
+                            },
+                            itemBuilder: (context) {
+                              return const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: ListTile(
+                                    leading: Icon(Icons.edit_outlined),
+                                    title: Text('Edit'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: ListTile(
+                                    leading: Icon(Icons.delete_outline),
+                                    title: Text('Delete'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ];
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
         );
       },
     );
