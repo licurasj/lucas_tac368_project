@@ -6,6 +6,7 @@ import 'app_cubit.dart';
 import 'app_state.dart';
 import 'journal_entry.dart';
 import 'app_colors.dart';
+import 'l10n/generated/app_localizations.dart';
 
 class JournalScreen extends StatefulWidget {
   const JournalScreen({super.key});
@@ -34,6 +35,7 @@ class _JournalScreenState extends State<JournalScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
+        final AppLocalizations loc = AppLocalizations.of(context);
         final Size screenSize = MediaQuery.of(dialogContext).size;
 
         return Dialog(
@@ -50,8 +52,8 @@ class _JournalScreenState extends State<JournalScreen> {
                       Expanded(
                         child: Text(
                           entry == null
-                              ? 'Add Journal Entry'
-                              : 'Edit Journal Entry',
+                              ? loc.addJournalEntry
+                              : loc.editJournalEntry,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                           style: const TextStyle(
@@ -72,8 +74,8 @@ class _JournalScreenState extends State<JournalScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Title',
+                    decoration: InputDecoration(
+                      labelText: loc.title,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -84,8 +86,8 @@ class _JournalScreenState extends State<JournalScreen> {
                       maxLines: null,
                       minLines: null,
                       textAlignVertical: TextAlignVertical.top,
-                      decoration: const InputDecoration(
-                        labelText: 'Entry',
+                      decoration: InputDecoration(
+                        labelText: loc.entry,
                         alignLabelWithHint: true,
                       ),
                     ),
@@ -98,7 +100,7 @@ class _JournalScreenState extends State<JournalScreen> {
                         onPressed: () {
                           Navigator.of(dialogContext).pop();
                         },
-                        child: const Text('Cancel'),
+                        child: Text(loc.cancel),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
@@ -118,7 +120,7 @@ class _JournalScreenState extends State<JournalScreen> {
 
                           Navigator.of(dialogContext).pop();
                         },
-                        child: const Text('Save'),
+                        child: Text(loc.save),
                       ),
                     ],
                   ),
@@ -143,6 +145,7 @@ class _JournalScreenState extends State<JournalScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
+        final AppLocalizations loc = AppLocalizations.of(context);
         final Size screenSize = MediaQuery.of(dialogContext).size;
         final String dateText =
             DateFormat.yMMMMd().add_jm().format(entry.createdAt.toLocal());
@@ -219,14 +222,14 @@ class _JournalScreenState extends State<JournalScreen> {
                           );
                         },
                         icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Edit'),
+                        label: Text(loc.edit),
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: () {
                           Navigator.of(dialogContext).pop();
                         },
-                        child: const Text('Close'),
+                        child: Text(loc.close),
                       ),
                     ],
                   ),
@@ -283,6 +286,7 @@ class _JournalScreenState extends State<JournalScreen> {
   Widget build(BuildContext context) {
     return BlocBuilder<AppCubit, AppState>(
       builder: (context, state) {
+        final AppLocalizations loc = AppLocalizations.of(context);
         final List<JournalEntry> entries = [...state.data.journalEntries]
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
@@ -304,7 +308,7 @@ class _JournalScreenState extends State<JournalScreen> {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: const Text('Journal'),
+            title: Text(loc.journal),
           ),
           floatingActionButton: FloatingActionButton(
                     shape: const CircleBorder(),
@@ -313,7 +317,7 @@ class _JournalScreenState extends State<JournalScreen> {
             onPressed: () {
               _showJournalDialog(context);
             },
-            tooltip: 'Add journal entry',
+            tooltip: loc.addJournalEntryTooltip,
             child: const Icon(Icons.add),
           ),
           body: RefreshIndicator(
@@ -324,10 +328,10 @@ class _JournalScreenState extends State<JournalScreen> {
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(12),
-                    children: const [
-                      SizedBox(height: 260),
+                    children: [
+                      const SizedBox(height: 260),
                       Center(
-                        child: Text('No journal entries yet.'),
+                        child: Text(loc.noJournalEntriesYet),
                       ),
                     ],
                   )

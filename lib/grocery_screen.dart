@@ -5,6 +5,7 @@ import 'app_cubit.dart';
 import 'app_state.dart';
 import 'grocery_item.dart';
 import 'app_colors.dart';
+import 'l10n/generated/app_localizations.dart';
 
 class GroceryScreen extends StatelessWidget {
   const GroceryScreen({super.key});
@@ -27,11 +28,13 @@ class GroceryScreen extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
+        final AppLocalizations loc = AppLocalizations.of(context);
+
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(
-                item == null ? 'Add Grocery Item' : 'Edit Grocery Item',
+                item == null ? loc.addGroceryItem : loc.editGroceryItem,
               ),
               content: SizedBox(
                 width: 420,
@@ -40,32 +43,32 @@ class GroceryScreen extends StatelessWidget {
                     children: [
                       TextField(
                         controller: titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Title *',
+                        decoration: InputDecoration(
+                          labelText: loc.titleRequired,
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: descriptionController,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
+                        decoration: InputDecoration(
+                          labelText: loc.description,
                         ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<GrocerySection>(
                         value: section,
-                        decoration: const InputDecoration(
-                          labelText: 'Section',
+                        decoration: InputDecoration(
+                          labelText: loc.section,
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: GrocerySection.current,
-                            child: Text('Current Grocery Run'),
+                            child: Text(loc.currentGroceryRun),
                           ),
                           DropdownMenuItem(
                             value: GrocerySection.nextTime,
-                            child: Text('Next Time'),
+                            child: Text(loc.nextTime),
                           ),
                         ],
                         onChanged: (value) {
@@ -79,11 +82,11 @@ class GroceryScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Add again to Next Time when completed',
+                        title: Text(
+                          loc.addAgainNextTime,
                         ),
-                        subtitle: const Text(
-                          'The item will appear in Next Time after you clear/delete it from Current Grocery Run.',
+                        subtitle: Text(
+                          loc.addAgainNextTimeDescription,
                         ),
                         value: autoAddToNext,
                         onChanged: (value) {
@@ -101,7 +104,7 @@ class GroceryScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text('Cancel'),
+                  child: Text(loc.cancel),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -124,7 +127,7 @@ class GroceryScreen extends StatelessWidget {
 
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text('Save'),
+                  child: Text(loc.save),
                 ),
               ],
             );
@@ -146,6 +149,7 @@ class GroceryScreen extends StatelessWidget {
     required GrocerySection section,
     required List<GroceryItem> items,
   }) {
+    final AppLocalizations loc = AppLocalizations.of(context);
     final int tickedCount = items.where((item) => item.isCompleted).length;
 
     return Card(
@@ -230,20 +234,20 @@ class GroceryScreen extends StatelessWidget {
                               if (item.description.trim().isNotEmpty)
                                 Text(item.description),
                               if (item.autoAddToNext)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 4),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
                                   child: Row(
                                     children: [
-                                      Icon(
+                                      const Icon(
                                         Icons.repeat,
                                         size: 15,
                                         color: AppColors.actionBlue,
                                       ),
-                                      SizedBox(width: 4),
+                                      const SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
-                                          'Repeats to Next Time after clearing',
-                                          style: TextStyle(
+                                          loc.repeatsToNextTime,
+                                          style: const TextStyle(
                                             color: AppColors.actionBlue,
                                           ),
                                         ),
@@ -258,7 +262,7 @@ class GroceryScreen extends StatelessWidget {
                             children: [
                               if (section == GrocerySection.nextTime)
                                 IconButton(
-                                  tooltip: 'Move to current run',
+                                  tooltip: loc.moveToCurrentRun,
                                   onPressed: () {
                                     context
                                         .read<AppCubit>()
@@ -268,7 +272,7 @@ class GroceryScreen extends StatelessWidget {
                                 ),
                               if (section == GrocerySection.current)
                                 IconButton(
-                                  tooltip: 'Move to next time',
+                                  tooltip: loc.moveToNextTime,
                                   onPressed: () {
                                     context
                                         .read<AppCubit>()
@@ -314,7 +318,7 @@ class GroceryScreen extends StatelessWidget {
                         initialSection: section,
                       );
                     },
-                    tooltip: 'Add grocery item',
+                    tooltip: loc.addGroceryItemTooltip,
                     child: const Icon(Icons.add),
                   ),
                 ),
@@ -330,7 +334,7 @@ class GroceryScreen extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '$tickedCount ticked',
+                      loc.tickedCount(tickedCount),
                       style: TextStyle(
                         color: Theme.of(context).textTheme.bodySmall?.color ??
                             AppColors.mutedText,
@@ -346,7 +350,7 @@ class GroceryScreen extends StatelessWidget {
                             }
                           : null,
                       icon: const Icon(Icons.cleaning_services_outlined),
-                      label: const Text('Clear Ticked'),
+                      label: Text(loc.clearTicked),
                     ),
                   ],
                 ),
@@ -362,6 +366,8 @@ class GroceryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AppCubit, AppState>(
       builder: (context, state) {
+        final AppLocalizations loc = AppLocalizations.of(context);
+
         final List<GroceryItem> currentItems = state.data.groceryItems
             .where((item) => item.section == GrocerySection.current)
             .toList()
@@ -387,7 +393,7 @@ class GroceryScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: const Text('Grocery List'),
+            title: Text(loc.groceryList),
           ),
           body: LayoutBuilder(
             builder: (context, constraints) {
@@ -403,8 +409,8 @@ class GroceryScreen extends StatelessWidget {
                         height: 520,
                         child: _sectionPanel(
                           context: context,
-                          title: 'Current Grocery Run',
-                          emptyText: 'No groceries for this run yet.',
+                          title: loc.currentGroceryRun,
+                          emptyText: loc.noGroceriesCurrent,
                           section: GrocerySection.current,
                           items: currentItems,
                         ),
@@ -413,8 +419,8 @@ class GroceryScreen extends StatelessWidget {
                         height: 520,
                         child: _sectionPanel(
                           context: context,
-                          title: 'Next Time',
-                          emptyText: 'No saved groceries for next time yet.',
+                          title: loc.nextTime,
+                          emptyText: loc.noGroceriesNext,
                           section: GrocerySection.nextTime,
                           items: nextTimeItems,
                         ),
@@ -437,8 +443,8 @@ class GroceryScreen extends StatelessWidget {
                         Expanded(
                           child: _sectionPanel(
                             context: context,
-                            title: 'Current Grocery Run',
-                            emptyText: 'No groceries for this run yet.',
+                            title: loc.currentGroceryRun,
+                            emptyText: loc.noGroceriesCurrent,
                             section: GrocerySection.current,
                             items: currentItems,
                           ),
@@ -446,8 +452,8 @@ class GroceryScreen extends StatelessWidget {
                         Expanded(
                           child: _sectionPanel(
                             context: context,
-                            title: 'Next Time',
-                            emptyText: 'No saved groceries for next time yet.',
+                            title: loc.nextTime,
+                            emptyText: loc.noGroceriesNext,
                             section: GrocerySection.nextTime,
                             items: nextTimeItems,
                           ),

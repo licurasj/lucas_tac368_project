@@ -11,6 +11,7 @@ import 'todo_screen.dart';
 import 'watchlist_screen.dart';
 import 'grocery_screen.dart';
 import 'app_colors.dart';
+import 'l10n/generated/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -230,8 +231,15 @@ class HybridNoteApp extends StatelessWidget {
     return BlocBuilder<AppCubit, AppState>(
       builder: (context, state) {
         return MaterialApp(
-          title: 'Hybrid Note App',
+          onGenerateTitle: (context) {
+            return AppLocalizations.of(context).appTitle;
+          },
           debugShowCheckedModeBanner: false,
+          locale: state.selectedLocaleCode == null
+              ? null
+              : Locale(state.selectedLocaleCode!),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           themeMode: state.isDarkMode ? ThemeMode.dark : ThemeMode.light,
@@ -297,31 +305,31 @@ class _MainShellState extends State<MainShell> {
         bottomNavigationBar: NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: _selectPage,
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard),
-              label: 'Home',
+              icon: const Icon(Icons.dashboard_outlined),
+              selectedIcon: const Icon(Icons.dashboard),
+              label: AppLocalizations.of(context).home,
             ),
             NavigationDestination(
-              icon: Icon(Icons.check_box_outlined),
-              selectedIcon: Icon(Icons.check_box),
-              label: 'Tasks',
+              icon: const Icon(Icons.check_box_outlined),
+              selectedIcon: const Icon(Icons.check_box),
+              label: AppLocalizations.of(context).tasks,
             ),
             NavigationDestination(
-              icon: Icon(Icons.shopping_cart_outlined),
-              selectedIcon: Icon(Icons.shopping_cart),
-              label: 'Grocery',
+              icon: const Icon(Icons.shopping_cart_outlined),
+              selectedIcon: const Icon(Icons.shopping_cart),
+              label: AppLocalizations.of(context).grocery,
             ),
             NavigationDestination(
-              icon: Icon(Icons.book_outlined),
-              selectedIcon: Icon(Icons.book),
-              label: 'Journal',
+              icon: const Icon(Icons.book_outlined),
+              selectedIcon: const Icon(Icons.book),
+              label: AppLocalizations.of(context).journal,
             ),
             NavigationDestination(
-              icon: Icon(Icons.movie_outlined),
-              selectedIcon: Icon(Icons.movie),
-              label: 'Watch/Read',
+              icon: const Icon(Icons.movie_outlined),
+              selectedIcon: const Icon(Icons.movie),
+              label: AppLocalizations.of(context).watchRead,
             ),
           ],
         ),

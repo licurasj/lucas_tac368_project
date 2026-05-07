@@ -7,6 +7,7 @@ import 'app_cubit.dart';
 import 'app_state.dart';
 import 'task_item.dart';
 import 'app_colors.dart';
+import 'l10n/generated/app_localizations.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -18,11 +19,13 @@ class TodoScreen extends StatefulWidget {
 }
 
 class _TodoScreenState extends State<TodoScreen> {
+  late AppLocalizations loc;
+
   String selectedCategory = AppData.defaultCategory;
 
   String _categoryDisplayName(String category) {
     if (category == AppData.defaultCategory) {
-      return 'All My Tasks';
+      return loc.allMyTasks;
     }
 
     return category;
@@ -54,9 +57,9 @@ class _TodoScreenState extends State<TodoScreen> {
               padding: const EdgeInsets.fromLTRB(18, 18, 8, 8),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Categories',
+                      loc.categories,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: TextStyle(
@@ -72,7 +75,7 @@ class _TodoScreenState extends State<TodoScreen> {
                     },
                     icon: const Icon(Icons.add),
                     color: AppColors.actionBlue,
-                    tooltip: 'Create category',
+                    tooltip: loc.createCategoryTooltip,
                   ),
                   if (isDrawer)
                     IconButton(
@@ -80,7 +83,7 @@ class _TodoScreenState extends State<TodoScreen> {
                         Navigator.of(context).pop();
                       },
                       icon: const Icon(Icons.close),
-                      tooltip: 'Close categories',
+                      tooltip: loc.closeCategories,
                     ),
                 ],
               ),
@@ -145,7 +148,7 @@ class _TodoScreenState extends State<TodoScreen> {
                                 Icons.delete_outline,
                                 size: 18,
                               ),
-                              tooltip: 'Delete category',
+                              tooltip: loc.deleteCategory,
                             ),
                         ],
                       ),
@@ -203,12 +206,12 @@ class _TodoScreenState extends State<TodoScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Create Category'),
+          title: Text(loc.createCategory),
           content: TextField(
             controller: nameController,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Category name',
+            decoration: InputDecoration(
+              labelText: loc.categoryName,
               border: OutlineInputBorder(),
             ),
             onSubmitted: (value) {
@@ -224,7 +227,7 @@ class _TodoScreenState extends State<TodoScreen> {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Cancel'),
+              child: Text(loc.cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -234,7 +237,7 @@ class _TodoScreenState extends State<TodoScreen> {
                   Navigator.of(dialogContext).pop(trimmedValue);
                 }
               },
-              child: const Text('Create'),
+              child: Text(loc.create),
             ),
           ],
         );
@@ -303,7 +306,7 @@ class _TodoScreenState extends State<TodoScreen> {
             }
 
             return AlertDialog(
-              title: Text(task == null ? 'Add Task' : 'Edit Task'),
+              title: Text(task == null ? loc.addTask : loc.editTask),
               content: ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxWidth: 440,
@@ -314,15 +317,15 @@ class _TodoScreenState extends State<TodoScreen> {
                     children: [
                       TextField(
                         controller: titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Title *',
+                        decoration: InputDecoration(
+                          labelText: loc.titleRequired,
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes',
+                        decoration: InputDecoration(
+                          labelText: loc.notes,
                         ),
                         maxLines: 3,
                       ),
@@ -330,8 +333,8 @@ class _TodoScreenState extends State<TodoScreen> {
                       DropdownButtonFormField<String>(
                         value: category,
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
+                        decoration: InputDecoration(
+                          labelText: loc.category,
                         ),
                         items: categories.map((categoryName) {
                           return DropdownMenuItem(
@@ -353,7 +356,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       const SizedBox(height: 12),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Set reminder'),
+                        title: Text(loc.setReminder),
                         value: hasReminder,
                         onChanged: (value) {
                           setDialogState(() {
@@ -393,8 +396,8 @@ class _TodoScreenState extends State<TodoScreen> {
                               icon: const Icon(Icons.calendar_today),
                               label: Text(
                                 reminderDate == null
-                                    ? 'Date'
-                                    : DateFormat.yMMMd().format(reminderDate!),
+                                    ? loc.date
+                                    : DateFormat.yMMMd(Localizations.localeOf(context).toLanguageTag()).format(reminderDate!),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -415,7 +418,7 @@ class _TodoScreenState extends State<TodoScreen> {
                               icon: const Icon(Icons.access_time),
                               label: Text(
                                 reminderTime == null
-                                    ? 'Time'
+                                    ? loc.time
                                     : reminderTime!.format(context),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -426,13 +429,13 @@ class _TodoScreenState extends State<TodoScreen> {
                         DropdownButtonFormField<RepeatFrequency>(
                           value: repeatFrequency,
                           isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Repeat',
+                          decoration: InputDecoration(
+                            labelText: loc.repeat,
                           ),
                           items: RepeatFrequency.values.map((repeat) {
                             return DropdownMenuItem(
                               value: repeat,
-                              child: Text(_repeatLabel(repeat)),
+                              child: Text(_repeatLabel(AppLocalizations.of(context), repeat)),
                             );
                           }).toList(),
                           onChanged: (value) {
@@ -448,15 +451,15 @@ class _TodoScreenState extends State<TodoScreen> {
                           TextField(
                             controller: customRepeatController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Repeat every how many days?',
+                            decoration: InputDecoration(
+                              labelText: loc.repeatEveryHowManyDays,
                             ),
                           ),
                         if (combinedReminder != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 10),
                             child: Text(
-                              'Reminder: ${DateFormat.yMMMd().add_jm().format(combinedReminder)}',
+                              loc.reminderText(DateFormat.yMMMd(Localizations.localeOf(context).toLanguageTag()).add_jm().format(combinedReminder)),
                               style: const TextStyle(
                                 color: AppColors.actionBlue,
                               ),
@@ -472,7 +475,7 @@ class _TodoScreenState extends State<TodoScreen> {
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text('Cancel'),
+                  child: Text(loc.cancel),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -521,7 +524,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text('Save'),
+                  child: Text(loc.save),
                 ),
               ],
             );
@@ -544,11 +547,11 @@ class _TodoScreenState extends State<TodoScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(subtask == null ? 'Add Subtask' : 'Edit Subtask'),
+          title: Text(subtask == null ? loc.addSubtask : loc.editSubtask),
           content: TextField(
             controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Subtask title *',
+            decoration: InputDecoration(
+              labelText: loc.subtaskTitleRequired,
             ),
           ),
           actions: [
@@ -556,7 +559,7 @@ class _TodoScreenState extends State<TodoScreen> {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Cancel'),
+              child: Text(loc.cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -575,7 +578,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Save'),
+              child: Text(loc.save),
             ),
           ],
         );
@@ -583,40 +586,41 @@ class _TodoScreenState extends State<TodoScreen> {
     );
   }
 
-  static String _repeatLabel(RepeatFrequency repeat) {
+  static String _repeatLabel(AppLocalizations loc, RepeatFrequency repeat) {
     switch (repeat) {
       case RepeatFrequency.none:
-        return 'Does not repeat';
+        return loc.doesNotRepeat;
       case RepeatFrequency.daily:
-        return 'Daily';
+        return loc.daily;
       case RepeatFrequency.weekly:
-        return 'Weekly';
+        return loc.weekly;
       case RepeatFrequency.monthly:
-        return 'Monthly';
+        return loc.monthly;
       case RepeatFrequency.yearly:
-        return 'Yearly';
+        return loc.yearly;
       case RepeatFrequency.custom:
-        return 'Custom';
+        return loc.custom;
     }
   }
 
-  String _reminderText(TaskItem task) {
+  String _reminderText(BuildContext context, TaskItem task) {
+    final AppLocalizations loc = AppLocalizations.of(context);
     if (task.reminderAt == null) {
       return '';
     }
 
     final String dateText =
-        DateFormat.yMMMd().add_jm().format(task.reminderAt!.toLocal());
+        DateFormat.yMMMd(Localizations.localeOf(context).toLanguageTag()).add_jm().format(task.reminderAt!.toLocal());
 
     if (task.repeatFrequency == RepeatFrequency.none) {
       return dateText;
     }
 
     if (task.repeatFrequency == RepeatFrequency.custom) {
-      return '$dateText • repeats every ${task.customRepeatDays ?? 1} day(s)';
+      return loc.repeatsEveryDays(dateText, task.customRepeatDays ?? 1);
     }
 
-    return '$dateText • repeats ${_repeatLabel(task.repeatFrequency).toLowerCase()}';
+    return loc.repeats(dateText, _repeatLabel(loc, task.repeatFrequency).toLowerCase());
   }
 
   String _taskSubtitle(TaskItem task) {
@@ -640,7 +644,7 @@ class _TodoScreenState extends State<TodoScreen> {
 
   String _taskBucket(TaskItem task) {
     if (task.reminderAt == null) {
-      return 'Today';
+      return loc.today;
     }
 
     final DateTime localReminder = task.reminderAt!.toLocal();
@@ -648,14 +652,14 @@ class _TodoScreenState extends State<TodoScreen> {
     final DateTime tomorrow = now.add(const Duration(days: 1));
 
     if (_isSameDate(localReminder, now)) {
-      return 'Today';
+      return loc.today;
     }
 
     if (_isSameDate(localReminder, tomorrow)) {
-      return 'Tomorrow';
+      return loc.tomorrow;
     }
 
-    return 'Later';
+    return loc.later;
   }
 
   Widget _buildTaskCard(
@@ -709,7 +713,7 @@ class _TodoScreenState extends State<TodoScreen> {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        _reminderText(task),
+                        _reminderText(context, task),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 2,
                         style: const TextStyle(
@@ -724,7 +728,7 @@ class _TodoScreenState extends State<TodoScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Subtasks: ${task.completedSubtaskCount}/${task.subtasks.length}',
+                  loc.subtaskProgress(task.completedSubtaskCount, task.subtasks.length),
                 ),
               ),
           ],
@@ -772,9 +776,9 @@ class _TodoScreenState extends State<TodoScreen> {
                 const Divider(),
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Subtasks',
+                        loc.subtasks,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -787,14 +791,14 @@ class _TodoScreenState extends State<TodoScreen> {
                         _showSubtaskDialog(context, task);
                       },
                       icon: const Icon(Icons.add),
-                      label: const Text('Add'),
+                      label: Text(loc.add),
                     ),
                   ],
                 ),
                 if (task.subtasks.isEmpty)
-                  const Align(
+                  Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('No subtasks yet.'),
+                    child: Text(loc.noSubtasksYet),
                   ),
                 for (final subtask in task.subtasks)
                   CheckboxListTile(
@@ -890,6 +894,8 @@ class _TodoScreenState extends State<TodoScreen> {
   Widget build(BuildContext context) {
     return BlocBuilder<AppCubit, AppState>(
       builder: (context, state) {
+        loc = AppLocalizations.of(context);
+
         final List<String> categories =
             state.data.categories.contains(AppData.defaultCategory)
                 ? state.data.categories
@@ -915,13 +921,13 @@ class _TodoScreenState extends State<TodoScreen> {
           });
 
         final List<TaskItem> todayTasks =
-            tasks.where((task) => _taskBucket(task) == 'Today').toList();
+            tasks.where((task) => _taskBucket(task) == loc.today).toList();
 
         final List<TaskItem> tomorrowTasks =
-            tasks.where((task) => _taskBucket(task) == 'Tomorrow').toList();
+            tasks.where((task) => _taskBucket(task) == loc.tomorrow).toList();
 
         final List<TaskItem> laterTasks =
-            tasks.where((task) => _taskBucket(task) == 'Later').toList();
+            tasks.where((task) => _taskBucket(task) == loc.later).toList();
 
         final int completedTaskCount =
             tasks.where((task) => task.isCompleted).length;
@@ -950,10 +956,10 @@ class _TodoScreenState extends State<TodoScreen> {
                               ? ListView(
                                   physics: const AlwaysScrollableScrollPhysics(),
                                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 96),
-                                  children: const [
-                                    SizedBox(height: 240),
+                                  children: [
+                                    const SizedBox(height: 240),
                                     Center(
-                                      child: Text('No tasks here yet.'),
+                                      child: Text(loc.noTasksHereYet),
                                     ),
                                   ],
                                 )
@@ -963,19 +969,19 @@ class _TodoScreenState extends State<TodoScreen> {
                                   children: [
                                     ..._buildTaskSection(
                                       context,
-                                      title: 'Today',
+                                      title: loc.today,
                                       tasks: todayTasks,
                                       categories: categories,
                                     ),
                                     ..._buildTaskSection(
                                       context,
-                                      title: 'Tomorrow',
+                                      title: loc.tomorrow,
                                       tasks: tomorrowTasks,
                                       categories: categories,
                                     ),
                                     ..._buildTaskSection(
                                       context,
-                                      title: 'Later',
+                                      title: loc.later,
                                       tasks: laterTasks,
                                       categories: categories,
                                     ),
@@ -993,7 +999,7 @@ class _TodoScreenState extends State<TodoScreen> {
                           onPressed: () {
                             _showTaskDialog(context, categories);
                           },
-                          tooltip: 'Add task',
+                          tooltip: loc.addTaskTooltip,
                           child: const Icon(Icons.add),
                         ),
                       ),
@@ -1010,7 +1016,7 @@ class _TodoScreenState extends State<TodoScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              '$completedTaskCount ticked',
+                              loc.tickedCount(completedTaskCount),
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Theme.of(context).textTheme.bodySmall?.color ??
@@ -1030,7 +1036,7 @@ class _TodoScreenState extends State<TodoScreen> {
                             icon: const Icon(
                               Icons.cleaning_services_outlined,
                             ),
-                            label: Text(isNarrow ? 'Clear' : 'Clear Ticked'),
+                            label: Text(isNarrow ? loc.clear : loc.clearTicked),
                           ),
                         ],
                       ),
@@ -1043,14 +1049,14 @@ class _TodoScreenState extends State<TodoScreen> {
             return Scaffold(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               appBar: AppBar(
-                title: const Text('Tasks'),
+                title: Text(loc.tasks),
                 actions: [
                   IconButton(
                     onPressed: () {
                       _showAddCategoryDialog(context);
                     },
                     icon: const Icon(Icons.create_new_folder_outlined),
-                    tooltip: 'Create category',
+                    tooltip: loc.createCategoryTooltip,
                   ),
                 ],
               ),

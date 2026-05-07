@@ -1,0 +1,183 @@
+{
+  "@@locale": "de",
+  "appTitle": "Hybrid Note App",
+  "home": "Start",
+  "tasks": "Aufgaben",
+  "grocery": "Einkauf",
+  "journal": "Journal",
+  "watchRead": "Ansehen/Lesen",
+  "language": "Sprache",
+  "languageSystem": "Systemstandard",
+  "languageEnglish": "English",
+  "languageChinese": "中文",
+  "languageJapanese": "日本語",
+  "languageFrench": "Français",
+  "languageSpanish": "Español",
+  "languageGerman": "Deutsch",
+  "chooseLanguage": "Sprache auswählen",
+  "languageFollowsDevice": "Use device language",
+  "switchToDarkMode": "In den Dunkelmodus wechseln",
+  "switchToLightMode": "In den Hellmodus wechseln",
+  "pendingTasks": "Pending Tasks",
+  "completedTasks": "Completed Tasks",
+  "journalEntries": "Journal Entries",
+  "watchReadItems": "Watch/Read Items",
+  "groceryItems": "Grocery Items",
+  "googleDriveSync": "Google Drive Sync",
+  "syncing": "Synchronisiere...",
+  "notSyncedYet": "Noch nicht synchronisiert.",
+  "lastSynced": "Last synced: {date}",
+  "@lastSynced": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "signInWithGoogle": "Sign in with Google",
+  "logOut": "Log out",
+  "syncToGoogleDrive": "Mit Google Drive synchronisieren",
+  "categories": "Categories",
+  "allMyTasks": "All My Tasks",
+  "createCategory": "Create Category",
+  "createCategoryTooltip": "Create category",
+  "closeCategories": "Close categories",
+  "deleteCategory": "Delete category",
+  "category": "Category",
+  "categoryName": "Category name",
+  "create": "Create",
+  "cancel": "Abbrechen",
+  "save": "Speichern",
+  "clear": "Clear",
+  "clearTicked": "Clear Ticked",
+  "delete": "Löschen",
+  "edit": "Bearbeiten",
+  "add": "Hinzufügen",
+  "addTask": "Add Task",
+  "addTaskTooltip": "Add task",
+  "editTask": "Edit Task",
+  "titleRequired": "Title *",
+  "title": "Title",
+  "notes": "Notes",
+  "setReminder": "Set reminder",
+  "date": "Date",
+  "time": "Time",
+  "repeat": "Repeat",
+  "doesNotRepeat": "Does not repeat",
+  "daily": "Daily",
+  "weekly": "Weekly",
+  "monthly": "Monthly",
+  "yearly": "Yearly",
+  "custom": "Custom",
+  "repeatEveryHowManyDays": "Repeat every how many days?",
+  "reminderText": "Reminder: {date}",
+  "@reminderText": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "today": "Today",
+  "tomorrow": "Tomorrow",
+  "later": "Later",
+  "noTasksHereYet": "No tasks here yet.",
+  "tickedCount": "{count} ticked",
+  "@tickedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addSubtask": "Add Subtask",
+  "editSubtask": "Edit Subtask",
+  "subtaskTitleRequired": "Subtask title *",
+  "subtasks": "Subtasks",
+  "noSubtasksYet": "No subtasks yet.",
+  "subtaskProgress": "Subtasks: {completed}/{total}",
+  "@subtaskProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "repeats": "{date} • repeats {repeat}",
+  "@repeats": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "repeat": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatsEveryDays": "{date} • repeats every {days} day(s)",
+  "@repeatsEveryDays": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "groceryList": "Grocery List",
+  "addGroceryItem": "Add Grocery Item",
+  "addGroceryItemTooltip": "Add grocery item",
+  "editGroceryItem": "Edit Grocery Item",
+  "description": "Description",
+  "section": "Section",
+  "currentGroceryRun": "Current Grocery Run",
+  "nextTime": "Next Time",
+  "addAgainNextTime": "Add again to Next Time when completed",
+  "addAgainNextTimeDescription": "The item will appear in Next Time after you clear/delete it from Current Grocery Run.",
+  "noGroceriesCurrent": "No groceries for this run yet.",
+  "noGroceriesNext": "No saved groceries for next time yet.",
+  "moveToCurrentRun": "Move to current run",
+  "moveToNextTime": "Move to next time",
+  "repeatsToNextTime": "Repeats to Next Time after clearing",
+  "addJournalEntry": "Add Journal Entry",
+  "addJournalEntryTooltip": "Add journal entry",
+  "editJournalEntry": "Edit Journal Entry",
+  "entry": "Entry",
+  "close": "Close",
+  "noJournalEntriesYet": "No journal entries yet.",
+  "watchReadList": "Watch/Read List",
+  "addWatchReadItem": "Add Watch/Read Item",
+  "addWatchReadItemTooltip": "Add watch/read item",
+  "editWatchReadItem": "Edit Watch/Read Item",
+  "type": "Type",
+  "status": "Status",
+  "movie": "Movie",
+  "tvShow": "TV Show",
+  "book": "Book",
+  "planned": "Planned",
+  "inProgress": "In Progress",
+  "completed": "Completed",
+  "season": "Season",
+  "episode": "Episode",
+  "seasonNumber": "Season {number}",
+  "@seasonNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "episodeNumber": "Episode {number}",
+  "@episodeNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "noWatchReadItemsYet": "No watch/read items yet."
+}

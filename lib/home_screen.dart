@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'app_cubit.dart';
 import 'app_state.dart';
 import 'app_colors.dart';
+import 'l10n/generated/app_localizations.dart';
 
 class HomeScreen extends StatelessWidget {
   final ValueChanged<int>? onNavigate;
@@ -60,14 +61,95 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+
   void _openPage(int index) {
     onNavigate?.call(index);
+  }
+
+  String _languageLabel(AppLocalizations loc, String? code) {
+    switch (code) {
+      case 'en':
+        return loc.languageEnglish;
+      case 'zh':
+        return loc.languageChinese;
+      case 'ja':
+        return loc.languageJapanese;
+      case 'fr':
+        return loc.languageFrench;
+      case 'es':
+        return loc.languageSpanish;
+      case 'de':
+        return loc.languageGerman;
+      case null:
+      default:
+        return loc.languageSystem;
+    }
+  }
+
+  Future<void> _showLanguageDialog(
+    BuildContext context,
+    AppState state,
+  ) async {
+    final AppLocalizations loc = AppLocalizations.of(context);
+
+    final List<({String? code, String label, String subtitle})> options = [
+      (code: null, label: loc.languageSystem, subtitle: loc.languageFollowsDevice),
+      (code: 'en', label: loc.languageEnglish, subtitle: 'English'),
+      (code: 'zh', label: loc.languageChinese, subtitle: 'Chinese'),
+      (code: 'ja', label: loc.languageJapanese, subtitle: 'Japanese'),
+      (code: 'fr', label: loc.languageFrench, subtitle: 'French'),
+      (code: 'es', label: loc.languageSpanish, subtitle: 'Spanish'),
+      (code: 'de', label: loc.languageGerman, subtitle: 'German'),
+    ];
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(loc.chooseLanguage),
+          content: SizedBox(
+            width: 420,
+            height: 360,
+            child: ListView.builder(
+              itemCount: options.length,
+              itemBuilder: (context, index) {
+                final option = options[index];
+                final bool selected = state.selectedLocaleCode == option.code;
+
+                return ListTile(
+                  selected: selected,
+                  leading: Icon(
+                    selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  ),
+                  title: Text(option.label),
+                  subtitle: Text(option.subtitle),
+                  onTap: () {
+                    context.read<AppCubit>().setPreferredLocaleCode(option.code);
+                    Navigator.of(dialogContext).pop();
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(loc.cancel),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AppCubit, AppState>(
       builder: (context, state) {
+        final AppLocalizations loc = AppLocalizations.of(context);
+
         if (state.isLoading) {
           return const Scaffold(
             body: Center(
@@ -78,8 +160,15 @@ class HomeScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Hybrid Note App'),
+            title: Text(loc.appTitle),
             actions: [
+              IconButton(
+                onPressed: () {
+                  _showLanguageDialog(context, state);
+                },
+                icon: const Icon(Icons.language),
+                tooltip: '${loc.language}: ${_languageLabel(loc, state.selectedLocaleCode)}',
+              ),
               IconButton(
                 onPressed: () {
                   context.read<AppCubit>().toggleDarkMode();
@@ -88,8 +177,8 @@ class HomeScreen extends StatelessWidget {
                   state.isDarkMode ? Icons.light_mode : Icons.dark_mode,
                 ),
                 tooltip: state.isDarkMode
-                    ? 'Switch to light mode'
-                    : 'Switch to dark mode',
+                    ? loc.switchToLightMode
+                    : loc.switchToDarkMode,
               ),
               IconButton(
                 onPressed: state.isSyncing
@@ -118,7 +207,7 @@ class HomeScreen extends StatelessWidget {
                 _summaryCard(
                   context: context,
                   icon: Icons.pending_actions,
-                  title: 'Pending Tasks',
+                  title: loc.pendingTasks,
                   value: '${state.pendingTaskCount}',
                   onTap: () {
                     _openPage(1);
@@ -127,7 +216,7 @@ class HomeScreen extends StatelessWidget {
                 _summaryCard(
                   context: context,
                   icon: Icons.done_all,
-                  title: 'Completed Tasks',
+                  title: loc.completedTasks,
                   value: '${state.completedTaskCount}',
                   onTap: () {
                     _openPage(1);
@@ -136,7 +225,7 @@ class HomeScreen extends StatelessWidget {
                 _summaryCard(
                   context: context,
                   icon: Icons.book,
-                  title: 'Journal Entries',
+                  title: loc.journalEntries,
                   value: '${state.data.journalEntries.length}',
                   onTap: () {
                     _openPage(3);
@@ -145,7 +234,7 @@ class HomeScreen extends StatelessWidget {
                 _summaryCard(
                   context: context,
                   icon: Icons.movie,
-                  title: 'Watch/Read Items',
+                  title: loc.watchReadItems,
                   value: '${state.data.watchItems.length}',
                   onTap: () {
                     _openPage(4);
@@ -154,7 +243,7 @@ class HomeScreen extends StatelessWidget {
                 _summaryCard(
                   context: context,
                   icon: Icons.shopping_cart,
-                  title: 'Grocery Items',
+                  title: loc.groceryItems,
                   value: '${state.data.groceryItems.length}',
                   onTap: () {
                     _openPage(2);
@@ -168,7 +257,7 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Google Drive Sync',
+                          loc.googleDriveSync,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -180,10 +269,10 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           state.isSyncing
-                              ? 'Syncing...'
+                              ? loc.syncing
                               : state.lastSyncedAt == null
-                                  ? 'Not synced yet.'
-                                  : 'Last synced: ${state.lastSyncedAt!.toLocal()}',
+                                  ? loc.notSyncedYet
+                                  : loc.lastSynced(state.lastSyncedAt!.toLocal().toString()),
                         ),
                         if (!state.isSyncing && state.syncMessage != null) ...[
                           const SizedBox(height: 8),
@@ -204,7 +293,7 @@ class HomeScreen extends StatelessWidget {
                             state.isGoogleSignedIn ? Icons.logout : Icons.login,
                           ),
                           label: Text(
-                            state.isGoogleSignedIn ? 'Log out' : 'Sign in with Google',
+                            state.isGoogleSignedIn ? loc.logOut : loc.signInWithGoogle,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -224,7 +313,7 @@ class HomeScreen extends StatelessWidget {
                                   ),
                                 )
                               : const Icon(Icons.cloud_sync),
-                          label: const Text('Sync to Google Drive'),
+                          label: Text(loc.syncToGoogleDrive),
                         ),
                       ],
                     ),

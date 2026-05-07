@@ -9,6 +9,7 @@ import 'app_data.dart';
 class AppStorage {
   static const String _dataFileName = 'hybrid_note_app_data.json';
   static const String _deviceFileName = 'hybrid_note_app_device.txt';
+  static const String _localeFileName = 'hybrid_note_app_locale.txt';
 
   Future<File> _getDataFile() async {
     final Directory directory = await getApplicationDocumentsDirectory();
@@ -18,6 +19,11 @@ class AppStorage {
   Future<File> _getDeviceFile() async {
     final Directory directory = await getApplicationDocumentsDirectory();
     return File('${directory.path}/$_deviceFileName');
+  }
+
+  Future<File> _getLocaleFile() async {
+    final Directory directory = await getApplicationDocumentsDirectory();
+    return File('${directory.path}/$_localeFileName');
   }
 
   Future<String> getOrCreateDeviceId() async {
@@ -69,4 +75,26 @@ class AppStorage {
     const JsonEncoder encoder = JsonEncoder.withIndent('  ');
     await file.writeAsString(encoder.convert(data.toJson()));
   }
+
+  Future<String?> loadPreferredLocaleCode() async {
+    final File file = await _getLocaleFile();
+
+    if (!await file.exists()) {
+      return null;
+    }
+
+    final String code = (await file.readAsString()).trim();
+
+    if (code.isEmpty || code == 'system') {
+      return null;
+    }
+
+    return code;
+  }
+
+  Future<void> savePreferredLocaleCode(String? localeCode) async {
+    final File file = await _getLocaleFile();
+    await file.writeAsString(localeCode == null ? 'system' : localeCode);
+  }
 }
+

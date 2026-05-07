@@ -25,6 +25,18 @@ class AppCubit extends Cubit<AppState> {
     required String deviceId,
   }) : super(AppState.initial(deviceId));
 
+
+  Future<void> setPreferredLocaleCode(String? localeCode) async {
+    await storage.savePreferredLocaleCode(localeCode);
+
+    emit(
+      state.copyWith(
+        selectedLocaleCode: localeCode,
+        clearSelectedLocale: localeCode == null,
+      ),
+    );
+  }
+
   void _clearSyncMessageSoon(
     String message, {
     Duration delay = const Duration(milliseconds: 900),
@@ -72,6 +84,7 @@ class AppCubit extends Cubit<AppState> {
 
     try {
       final AppData loadedData = await storage.loadAppData();
+      final String? preferredLocaleCode = await storage.loadPreferredLocaleCode();
 
       emit(
         state.copyWith(
@@ -79,6 +92,8 @@ class AppCubit extends Cubit<AppState> {
           isDarkMode: loadedData.isDarkMode,
           isLoading: false,
           isGoogleSignedIn: driveSyncService.isSignedIn,
+          selectedLocaleCode: preferredLocaleCode,
+          clearSelectedLocale: preferredLocaleCode == null,
           clearError: true,
         ),
       );

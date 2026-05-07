@@ -9,6 +9,7 @@ class AppState {
   final String? errorMessage;
   final String? syncMessage;
   final DateTime? lastSyncedAt;
+  final String? selectedLocaleCode;
 
   const AppState({
     required this.data,
@@ -19,6 +20,7 @@ class AppState {
     this.errorMessage,
     this.syncMessage,
     this.lastSyncedAt,
+    this.selectedLocaleCode,
   });
 
   factory AppState.initial(String deviceId) {
@@ -37,11 +39,13 @@ class AppState {
     bool? isSyncing,
     bool? isGoogleSignedIn,
     bool? isDarkMode,
+    String? selectedLocaleCode,
     String? errorMessage,
     String? syncMessage,
     DateTime? lastSyncedAt,
     bool clearError = false,
     bool clearSyncMessage = false,
+    bool clearSelectedLocale = false,
   }) {
     return AppState(
       data: data ?? this.data,
@@ -52,6 +56,9 @@ class AppState {
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       syncMessage: clearSyncMessage ? null : syncMessage ?? this.syncMessage,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      selectedLocaleCode: clearSelectedLocale
+          ? null
+          : selectedLocaleCode ?? this.selectedLocaleCode,
     );
   }
 

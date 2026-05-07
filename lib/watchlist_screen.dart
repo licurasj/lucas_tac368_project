@@ -5,6 +5,7 @@ import 'app_cubit.dart';
 import 'app_state.dart';
 import 'watch_item.dart';
 import 'app_colors.dart';
+import 'l10n/generated/app_localizations.dart';
 
 class WatchlistScreen extends StatelessWidget {
   const WatchlistScreen({super.key});
@@ -36,11 +37,13 @@ class WatchlistScreen extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
+        final AppLocalizations loc = AppLocalizations.of(context);
+
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(
-                item == null ? 'Add Watch/Read Item' : 'Edit Watch/Read Item',
+                item == null ? loc.addWatchReadItem : loc.editWatchReadItem,
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -52,29 +55,29 @@ class WatchlistScreen extends StatelessWidget {
                     children: [
                       TextField(
                         controller: titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Title *',
+                        decoration: InputDecoration(
+                          labelText: loc.titleRequired,
                         ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<MediaType>(
                         value: selectedType,
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Type',
+                        decoration: InputDecoration(
+                          labelText: loc.type,
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: MediaType.movie,
-                            child: Text('Movie'),
+                            child: Text(loc.movie),
                           ),
                           DropdownMenuItem(
                             value: MediaType.tvShow,
-                            child: Text('TV Show'),
+                            child: Text(loc.tvShow),
                           ),
                           DropdownMenuItem(
                             value: MediaType.book,
-                            child: Text('Book'),
+                            child: Text(loc.book),
                           ),
                         ],
                         onChanged: (value) {
@@ -94,13 +97,13 @@ class WatchlistScreen extends StatelessWidget {
                       DropdownButtonFormField<WatchStatus>(
                         value: selectedStatus,
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Status',
+                        decoration: InputDecoration(
+                          labelText: loc.status,
                         ),
                         items: WatchStatus.values.map((status) {
                           return DropdownMenuItem(
                             value: status,
-                            child: Text(_statusLabel(status)),
+                            child: Text(_statusLabel(AppLocalizations.of(context), status)),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -116,16 +119,16 @@ class WatchlistScreen extends StatelessWidget {
                         TextField(
                           controller: seasonController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Season',
+                          decoration: InputDecoration(
+                            labelText: loc.season,
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: episodeController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Episode',
+                          decoration: InputDecoration(
+                            labelText: loc.episode,
                           ),
                         ),
                       ],
@@ -133,8 +136,8 @@ class WatchlistScreen extends StatelessWidget {
                       TextField(
                         controller: notesController,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes',
+                        decoration: InputDecoration(
+                          labelText: loc.notes,
                         ),
                       ),
                     ],
@@ -146,7 +149,7 @@ class WatchlistScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text('Cancel'),
+                  child: Text(loc.cancel),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -173,7 +176,7 @@ class WatchlistScreen extends StatelessWidget {
 
                     Navigator.of(dialogContext).pop();
                   },
-                  child: const Text('Save'),
+                  child: Text(loc.save),
                 ),
               ],
             );
@@ -188,41 +191,42 @@ class WatchlistScreen extends StatelessWidget {
     // "A TextEditingController was used after being disposed."
   }
 
-  static String _statusLabel(WatchStatus status) {
+  static String _statusLabel(AppLocalizations loc, WatchStatus status) {
     switch (status) {
       case WatchStatus.planned:
-        return 'Planned';
+        return loc.planned;
       case WatchStatus.inProgress:
-        return 'In Progress';
+        return loc.inProgress;
       case WatchStatus.completed:
-        return 'Completed';
+        return loc.completed;
     }
   }
 
-  String _typeLabel(MediaType type) {
+  String _typeLabel(AppLocalizations loc, MediaType type) {
     switch (type) {
       case MediaType.movie:
-        return 'Movie';
+        return loc.movie;
       case MediaType.tvShow:
-        return 'TV Show';
+        return loc.tvShow;
       case MediaType.book:
-        return 'Book';
+        return loc.book;
     }
   }
 
-  String _watchSubtitle(WatchItem item) {
+  String _watchSubtitle(BuildContext context, WatchItem item) {
+    final AppLocalizations loc = AppLocalizations.of(context);
     final List<String> parts = [
-      _typeLabel(item.type),
-      _statusLabel(item.status),
+      _typeLabel(loc, item.type),
+      _statusLabel(loc, item.status),
     ];
 
     if (item.type == MediaType.tvShow) {
       if (item.season > 0) {
-        parts.add('Season ${item.season}');
+        parts.add(loc.seasonNumber(item.season));
       }
 
       if (item.episode > 0) {
-        parts.add('Episode ${item.episode}');
+        parts.add(loc.episodeNumber(item.episode));
       }
     }
 
@@ -237,13 +241,14 @@ class WatchlistScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AppCubit, AppState>(
       builder: (context, state) {
+        final AppLocalizations loc = AppLocalizations.of(context);
         final List<WatchItem> items = [...state.data.watchItems]
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: const Text('Watch/Read List'),
+            title: Text(loc.watchReadList),
           ),
           floatingActionButton: FloatingActionButton(
                     shape: const CircleBorder(),
@@ -252,7 +257,7 @@ class WatchlistScreen extends StatelessWidget {
             onPressed: () {
               _showWatchItemDialog(context);
             },
-            tooltip: 'Add watch/read item',
+            tooltip: loc.addWatchReadItemTooltip,
             child: const Icon(Icons.add),
           ),
           body: RefreshIndicator(
@@ -263,10 +268,10 @@ class WatchlistScreen extends StatelessWidget {
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(12),
-                    children: const [
-                      SizedBox(height: 260),
+                    children: [
+                      const SizedBox(height: 260),
                       Center(
-                        child: Text('No watch/read items yet.'),
+                        child: Text(loc.noWatchReadItemsYet),
                       ),
                     ],
                   )
@@ -288,7 +293,7 @@ class WatchlistScreen extends StatelessWidget {
                             maxLines: 2,
                           ),
                           subtitle: Text(
-                            _watchSubtitle(item),
+                            _watchSubtitle(context, item),
                             overflow: TextOverflow.ellipsis,
                             maxLines: 3,
                           ),
@@ -308,20 +313,20 @@ class WatchlistScreen extends StatelessWidget {
                               }
                             },
                             itemBuilder: (context) {
-                              return const [
+                              return [
                                 PopupMenuItem(
                                   value: 'edit',
                                   child: ListTile(
-                                    leading: Icon(Icons.edit_outlined),
-                                    title: Text('Edit'),
+                                    leading: const Icon(Icons.edit_outlined),
+                                    title: Text(loc.edit),
                                     contentPadding: EdgeInsets.zero,
                                   ),
                                 ),
                                 PopupMenuItem(
                                   value: 'delete',
                                   child: ListTile(
-                                    leading: Icon(Icons.delete_outline),
-                                    title: Text('Delete'),
+                                    leading: const Icon(Icons.delete_outline),
+                                    title: Text(loc.delete),
                                     contentPadding: EdgeInsets.zero,
                                   ),
                                 ),

@@ -1,0 +1,183 @@
+{
+  "@@locale": "zh",
+  "appTitle": "混合笔记",
+  "home": "首页",
+  "tasks": "任务",
+  "grocery": "购物",
+  "journal": "日记",
+  "watchRead": "观看/阅读",
+  "language": "语言",
+  "languageSystem": "跟随系统",
+  "languageEnglish": "English",
+  "languageChinese": "中文",
+  "languageJapanese": "日本語",
+  "languageFrench": "Français",
+  "languageSpanish": "Español",
+  "languageGerman": "Deutsch",
+  "chooseLanguage": "选择语言",
+  "languageFollowsDevice": "使用设备语言",
+  "switchToDarkMode": "切换到深色模式",
+  "switchToLightMode": "切换到浅色模式",
+  "pendingTasks": "待办任务",
+  "completedTasks": "已完成任务",
+  "journalEntries": "日记条目",
+  "watchReadItems": "观看/阅读项目",
+  "groceryItems": "购物项目",
+  "googleDriveSync": "Google 云端硬盘同步",
+  "syncing": "正在同步...",
+  "notSyncedYet": "尚未同步。",
+  "lastSynced": "上次同步：{date}",
+  "@lastSynced": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "signInWithGoogle": "使用 Google 登录",
+  "logOut": "退出登录",
+  "syncToGoogleDrive": "同步到 Google 云端硬盘",
+  "categories": "分类",
+  "allMyTasks": "全部任务",
+  "createCategory": "创建分类",
+  "createCategoryTooltip": "创建分类",
+  "closeCategories": "关闭分类",
+  "deleteCategory": "删除分类",
+  "category": "分类",
+  "categoryName": "分类名称",
+  "create": "创建",
+  "cancel": "取消",
+  "save": "保存",
+  "clear": "清除",
+  "clearTicked": "清除已勾选",
+  "delete": "删除",
+  "edit": "编辑",
+  "add": "添加",
+  "addTask": "添加任务",
+  "addTaskTooltip": "添加任务",
+  "editTask": "编辑任务",
+  "titleRequired": "标题 *",
+  "title": "标题",
+  "notes": "备注",
+  "setReminder": "设置提醒",
+  "date": "日期",
+  "time": "时间",
+  "repeat": "重复",
+  "doesNotRepeat": "不重复",
+  "daily": "每天",
+  "weekly": "每周",
+  "monthly": "每月",
+  "yearly": "每年",
+  "custom": "自定义",
+  "repeatEveryHowManyDays": "每隔多少天重复？",
+  "reminderText": "提醒：{date}",
+  "@reminderText": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "today": "今天",
+  "tomorrow": "明天",
+  "later": "之后",
+  "noTasksHereYet": "这里还没有任务。",
+  "tickedCount": "已勾选 {count} 项",
+  "@tickedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addSubtask": "添加子任务",
+  "editSubtask": "编辑子任务",
+  "subtaskTitleRequired": "子任务标题 *",
+  "subtasks": "子任务",
+  "noSubtasksYet": "还没有子任务。",
+  "subtaskProgress": "子任务：{completed}/{total}",
+  "@subtaskProgress": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "repeats": "{date} • 重复：{repeat}",
+  "@repeats": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "repeat": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatsEveryDays": "{date} • 每 {days} 天重复",
+  "@repeatsEveryDays": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "groceryList": "购物清单",
+  "addGroceryItem": "添加购物项目",
+  "addGroceryItemTooltip": "添加购物项目",
+  "editGroceryItem": "编辑购物项目",
+  "description": "描述",
+  "section": "区域",
+  "currentGroceryRun": "本次购物",
+  "nextTime": "下次",
+  "addAgainNextTime": "完成后再次加入下次",
+  "addAgainNextTimeDescription": "从本次购物清除/删除后，该项目会出现在下次。",
+  "noGroceriesCurrent": "本次购物还没有项目。",
+  "noGroceriesNext": "下次还没有保存的项目。",
+  "moveToCurrentRun": "移到本次购物",
+  "moveToNextTime": "移到下次",
+  "repeatsToNextTime": "清除后会重复到下次",
+  "addJournalEntry": "添加日记",
+  "addJournalEntryTooltip": "添加日记",
+  "editJournalEntry": "编辑日记",
+  "entry": "正文",
+  "close": "关闭",
+  "noJournalEntriesYet": "还没有日记。",
+  "watchReadList": "观看/阅读清单",
+  "addWatchReadItem": "添加观看/阅读项目",
+  "addWatchReadItemTooltip": "添加观看/阅读项目",
+  "editWatchReadItem": "编辑观看/阅读项目",
+  "type": "类型",
+  "status": "状态",
+  "movie": "电影",
+  "tvShow": "电视剧",
+  "book": "书",
+  "planned": "计划中",
+  "inProgress": "进行中",
+  "completed": "已完成",
+  "season": "季",
+  "episode": "集",
+  "seasonNumber": "第 {number} 季",
+  "@seasonNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "episodeNumber": "第 {number} 集",
+  "@episodeNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "noWatchReadItemsYet": "还没有观看/阅读项目。"
+}
